@@ -9,29 +9,31 @@ import org.jetbrains.annotations.NotNull;
 
 import static fr.elias.mythicDrop.MythicDrop.*;
 
-
 public class MythicDropCommand implements CommandExecutor {
 
-    MythicDrop plugin = MythicDrop.getInstance();
+    private final MythicDrop plugin = MythicDrop.getInstance();
 
     @Override
-    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, String label, @NotNull String[] args) {
-        if (label.equalsIgnoreCase("mythicdrop") && args.length > 0 && args[0].equalsIgnoreCase("reload")) {
-            // Reload main configuration file
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
+            // Reload Bukkit config system (plugin.yml linked config)
             plugin.reloadConfig();
 
-            // Reload custom configuration files
+            // Reload custom config wrapper for config.yml
+            plugin.config = new fr.elias.mythicDrop.utils.Config("config.yml");
+
+            // Reload other config files
             announcementConfig.reload();
             debugConfig.reload();
-
-            // Reload top3damage.yml and top5damage.yml
             top3Config.reload();
             top5Config.reload();
+            effectsConfig.reload(); // <-- Add this
 
-            // Notify the sender that the configurations have been reloaded
-            sender.sendMessage(ChatColor.GREEN + "MythicDrop configuration reloaded, including top3damage.yml and top5damage.yml.");
+            // Confirm to user
+            sender.sendMessage(ChatColor.GREEN + "MythicDrop configuration reloaded successfully.");
             return true;
         }
+
         return false;
     }
 }

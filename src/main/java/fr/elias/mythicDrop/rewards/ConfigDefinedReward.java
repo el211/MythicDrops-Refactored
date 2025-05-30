@@ -11,13 +11,17 @@ import org.bukkit.entity.Player;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class ConfigDefinedReward implements Reward {
-    private final FileConfiguration config; // Use existing config.yml
+    private FileConfiguration getConfig() {
+        return MythicDrop.getInstance().getConfig();
+    }
     private final String mobName;
 
-    public ConfigDefinedReward(String mobName) {
-        this.config = MythicDrop.getInstance().getConfig(); // Load from main config.yml
+    private final FileConfiguration config;
+
+    public ConfigDefinedReward(String mobName, FileConfiguration config) {
         this.mobName = mobName;
-        ensureMobConfigExists(); // Ensure the section exists safely
+        this.config = config;
+        ensureMobConfigExists();
     }
 
     @Override
@@ -28,7 +32,7 @@ public class ConfigDefinedReward implements Reward {
         }
 
         // Fetch drop configuration for this mob
-        ConfigurationSection mobConfig = config.getConfigurationSection(mobName + ".drops");
+        ConfigurationSection mobConfig = getConfig().getConfigurationSection(mobName + ".drops");
         if (mobConfig == null) {
             logDebug("No drop configuration found for mob: " + mobName);
             return;
@@ -84,7 +88,7 @@ public class ConfigDefinedReward implements Reward {
     }
 
     private void ensureMobConfigExists() {
-        if (!config.contains(mobName + ".drops")) {
+        if (!getConfig().contains(mobName + ".drops")) {
             logDebug("No drops found for " + mobName + ". Skipping default generation.");
         }
     }

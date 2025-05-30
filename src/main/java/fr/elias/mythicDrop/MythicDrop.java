@@ -2,6 +2,8 @@ package fr.elias.mythicDrop;
 
 import fr.elias.mythicDrop.commands.MythicDropCommand;
 import fr.elias.mythicDrop.commands.tabCompleters.MythicDropCompleter;
+import fr.elias.mythicDrop.effects.EffectInitializer;
+import fr.elias.mythicDrop.effects.EffectListener;
 import fr.elias.mythicDrop.listeners.MythicMobListener;
 import fr.elias.mythicDrop.utils.Config;
 import lombok.Getter;
@@ -28,11 +30,12 @@ public class MythicDrop extends JavaPlugin {
     @Getter
     private final Set<UUID> processedTop5Events = new HashSet<>();
     @Getter
-    private Config config;
+    public Config config;
     public static Config debugConfig;
     public static Config top3Config;
     public static Config top5Config;
     public static Config announcementConfig;
+    public static Config effectsConfig;
 
     @Override
     public void onEnable() {
@@ -52,15 +55,20 @@ public class MythicDrop extends JavaPlugin {
             // Initialize custom wrapped config after Bukkit reloadConfig()
             this.config = new Config("config.yml");
             logDebug("Main configuration loaded.");
+            EffectInitializer.registerDefaults();
 
             // Load all additional configurations
             top3Config = new Config("top3damage.yml");
             top5Config = new Config("top5damage.yml");
             announcementConfig = new Config("announcement.yml");
 
+// Load effects config
+            saveResource("effects.yml", false);
+            effectsConfig = new Config("effects.yml");
             // Register listeners
             Bukkit.getPluginManager().registerEvents(new MythicMobListener(), this);
             logDebug("Event listeners registered.");
+            Bukkit.getPluginManager().registerEvents(new EffectListener(), this);
 
             // Register commands and tab completers
             if (this.getCommand("mythicdrop") != null) {

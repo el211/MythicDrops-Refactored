@@ -10,7 +10,7 @@ reward-processing:
 #  Modules:
 #    ThreatTable: true
 # Configuration for different mobs and their drops
-Skeleton-king:
+Skeletonking:
   drops:
     default:
       drop1:
@@ -39,7 +39,7 @@ Skeleton-king:
         chance: 0.3
         message: "&a&lVIP! You received 200 money for defeating the Skeleton King!"
 
-Zombie-lord:
+Zombielord:
   drops:
     default:
       drop1:

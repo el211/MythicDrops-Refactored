@@ -7,7 +7,12 @@ import fr.elias.mythicDrop.rewards.MostDamageReward;
 import fr.elias.mythicDrop.rewards.RewardProcessor;
 import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 import io.lumine.mythic.core.mobs.ActiveMob;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+
+import java.io.File;
 
 import static fr.elias.mythicDrop.MythicDrop.announcementConfig;
 import static fr.elias.mythicDrop.MythicDrop.top3Config;
@@ -22,34 +27,27 @@ public class RewardProcessingHandler {
         logDebug("Processing rewards for mob: " + mobName);
 
         // Config-based reward (from config.yml)
-        if (MythicDrop.getInstance().getConfig().contains(mobName + ".drops")) {
+        ConfigurationSection mobSection = MythicDrop.getInstance().getConfig().getConfigurationSection(mobName);
+
+        if (mobSection != null && mobSection.isConfigurationSection("drops")) {
             logDebug("Mob " + mobName + " has custom drops defined in config.yml. Using ConfigDefinedReward.");
-            new RewardProcessor(new ConfigDefinedReward(mobName)).execute(lastHitter, activeMob);
-        }
-        // Top 3 rewards
-        else if (top3Config.getStringList("rewardtop3").contains(mobName)) {
+            FileConfiguration liveConfig = YamlConfiguration.loadConfiguration(new File(MythicDrop.getInstance().getDataFolder(), "config.yml"));
+            new RewardProcessor(new ConfigDefinedReward(mobName, liveConfig)).execute(lastHitter, activeMob);
+        } else if (top3Config.getStringList("rewardtop3").contains(mobName)) {
             logDebug("Delegating to Top3RewardsHandler for mob: " + mobName);
             Top3RewardsHandler.handle(activeMob);
-        }
-        // Top 5 rewards
-        else if (top5Config.getStringList("rewardtop5").contains(mobName)) {
+        } else if (top5Config.getStringList("rewardtop5").contains(mobName)) {
             logDebug("Delegating to Top5RewardsHandler for mob: " + mobName);
             Top5RewardsHandler.handle(activeMob);
-        }
-        // Most damage
-        else if (MythicDrop.getInstance().getConfig().getBoolean("reward-processing.most-damage", false)
+        } else if (MythicDrop.getInstance().getConfig().getBoolean("reward-processing.most-damage", false)
                 && activeMob.hasThreatTable()) {
             logDebug("Delegating to MostDamageRewardsHandler...");
             MostDamageRewardsHandler.handle(activeMob);
-        }
-        // Last hit
-        else if (MythicDrop.getInstance().getConfig().getBoolean("reward-processing.last-hit", true)
+        } else if (MythicDrop.getInstance().getConfig().getBoolean("reward-processing.last-hit", true)
                 && lastHitter != null) {
             logDebug("Delegating to LastHitRewardsHandler...");
             LastHitRewardsHandler.handle(activeMob, event);
-        }
-        // Fallback
-        else {
+        } else {
             logDebug("No applicable reward strategy found for mob: " + mobName);
         }
 
