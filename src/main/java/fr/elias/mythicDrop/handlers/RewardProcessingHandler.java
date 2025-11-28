@@ -50,7 +50,7 @@ public class RewardProcessingHandler {
         } else {
             logDebug("No applicable reward strategy found for mob: " + mobName);
         }
-
+//
         // Announce
         boolean globalAnnounce = announcementConfig.getBoolean("announce-on-death", true);
         boolean specificMobAnnounce = announcementConfig.getBoolean("announce-specific-mob." + mobName, globalAnnounce);
