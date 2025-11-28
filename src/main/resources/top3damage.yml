@@ -1,18 +1,32 @@
-# In this config is to configure mobs in which you want top 3 damage depending on who made most damage .
-# Make sure you add ThreatTable: true to the mob's MythicMobs config if you Plan to use this section
+# Configuration for mobs that use top-3 damage rewards
+# You must set "ThreatTable: true" in the MythicMobs config for this to apply
+# Example mob config:
 # BigScaryBoss:
-#  Type: zombie
-#  Display: '&6Zombie'
-#  Health: 20000
-#  Modules:
-#    ThreatTable: true
+#   Type: zombie
+#   Display: '&6Zombie'
+#   Health: 20000
+#   Modules:
+#     ThreatTable: true
+
 rewardtop3:
-  - SkeletalKnight
+  - SkeletalKnight  # List of mobs using top-3 reward logic
+  -
+rewardtop3-settings:
+  use-flexible-rewards: true  # true = all rewards are tried by chance
+                                # false = legacy mode (stop after guaranteed)
+
 
 SkeletalKnight:
-  guaranteed-rewards: 1 # Limit rewards to 1 from the list
-  use-standard-rewards: false
-  first-place:
+  use-standard-rewards: false        # Skip normal config.yml drops for this mob
+  guaranteedperrank: true            # Enables guaranteed-rewards under each rank section
+  per-rank-group: true               # Enables group-based guaranteed reward values
+  guaranteed-rewards:               # Fallback values by permission group
+    default: 1
+    vip: 2
+    legend: 3
+
+  first-place:                       # Player with highest damage dealt
+    guaranteed-rewards: 1            # Used if guaranteedperrank: true
     default:
       drop1:
         command: "give %player% diamond 3"
@@ -23,7 +37,9 @@ SkeletalKnight:
         command: "give %player% diamond 5"
         chance: 0.9
         message: "&b&lVIP First Place! You got 5 diamonds from the Skeleton King!"
-  second-place:
+
+  second-place:                      # Player with second highest damage
+    guaranteed-rewards: 1
     default:
       drop1:
         command: "give %player% diamond 2"
@@ -34,7 +50,9 @@ SkeletalKnight:
         command: "give %player% diamond 3"
         chance: 0.7
         message: "&e&lVIP Second Place! You got 3 diamonds from the Skeleton King!"
-  third-place:
+
+  third-place:                       # Player with third highest damage
+    guaranteed-rewards: 1
     default:
       drop1:
         command: "give %player% diamond 1"
@@ -45,8 +63,9 @@ SkeletalKnight:
         command: "give %player% diamond 2"
         chance: 0.6
         message: "&c&lVIP Third Place! You got 2 diamonds from the Skeleton King!"
-  everyone-else-who-contributed:
-    min-damage: 50.0 # Minimum damage required to qualify for rewards
+
+  everyone-else-who-contributed:     # Players outside top-3 but dealt enough damage
+    min-damage: 50.0                 # Must deal this much to qualify
     default:
       drop1:
         command: "give %player% emerald 1"

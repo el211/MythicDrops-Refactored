@@ -12,11 +12,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 
 import java.util.Map;
+import java.util.UUID;
 
 public class EffectListener implements Listener {
 
     @EventHandler
     public void onMobDeath(MythicMobDeathEvent event) {
+        UUID mobId = event.getEntity().getUniqueId();
+        if (!MythicDrop.getInstance().getProcessedMobEvents().add(mobId)) return;
+
         ActiveMob activeMob = MythicBukkit.inst().getMobManager()
                 .getActiveMob(event.getEntity().getUniqueId())
                 .orElse(null);
@@ -36,5 +40,6 @@ public class EffectListener implements Listener {
             EffectRegistry.get(type).execute(event.getEntity().getLocation(), (Map) effectData.getValues(true));
         }
     }
+
 }
 

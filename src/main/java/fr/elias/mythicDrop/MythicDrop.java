@@ -14,6 +14,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
 import java.util.*;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
@@ -62,9 +63,15 @@ public class MythicDrop extends JavaPlugin {
             top5Config = new Config("top5damage.yml");
             announcementConfig = new Config("announcement.yml");
 
-// Load effects config
-            saveResource("effects.yml", false);
+             // Load effects config
+            // Load effects config only if not already saved
+            File effectsFile = new File(getDataFolder(), "effects.yml");
+            if (!effectsFile.exists()) {
+                saveResource("effects.yml", false);
+                logDebug("Saved default effects.yml to data folder.");
+            }
             effectsConfig = new Config("effects.yml");
+
             // Register listeners
             Bukkit.getPluginManager().registerEvents(new MythicMobListener(), this);
             logDebug("Event listeners registered.");

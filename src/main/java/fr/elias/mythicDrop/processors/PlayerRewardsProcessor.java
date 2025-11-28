@@ -8,9 +8,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
+import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
@@ -26,9 +26,8 @@ public class PlayerRewardsProcessor {
         String mobName = activeMob.getType().getInternalName();
         logDebug("Starting reward processing for mob: " + mobName + ", player: " + player.getName() + ", position: " + position);
 
-        // Check if the mob has drop configuration in config.yml
         if (!config.contains(mobName + ".drops")) {
-            logDebug("No drop configuration found for mob: " + mobName + " in config.yml.");
+            logDebug("No drop configuration found for mob: " + mobName);
             return;
         }
 
@@ -38,96 +37,65 @@ public class PlayerRewardsProcessor {
             return;
         }
 
-        // Get the player's primary group for group-specific drops
+        boolean flexibleMode = config.getBoolean(mobName + ".flexible-reward-mode", false);
+        logDebug("Flexible reward mode for " + mobName + ": " + flexibleMode);
+
         String primaryGroup = plugin.getPrimaryGroup(player);
-        logDebug("Player " + player.getName() + " belongs to primary group: " + primaryGroup);
+        logDebug("Player " + player.getName() + " belongs to group: " + primaryGroup);
 
         ConfigurationSection groupDrops = mobDrops.contains(primaryGroup)
                 ? mobDrops.getConfigurationSection(primaryGroup)
                 : mobDrops.getConfigurationSection("default");
 
         if (groupDrops == null) {
-            logDebug("No valid drop configuration found for player group: " + primaryGroup + " or default.");
+            logDebug("No drop configuration for group: " + primaryGroup + " or default.");
             return;
         }
 
-        logDebug("Processing rewards for player group: " + primaryGroup + " (or default). Available reward keys: " + groupDrops.getKeys(false));
-
-        // Get the guaranteed-rewards value, defaulting to 1 if not set
-        int guaranteedRewards = mobDrops.contains("guaranteed-rewards")
-                ? mobDrops.getInt("guaranteed-rewards")
-                : 0;  // <- Don't guarantee if not explicitly configured
-
-        // Collect all potential reward keys
         List<String> rewardKeys = new ArrayList<>(groupDrops.getKeys(false));
+        Collections.shuffle(rewardKeys);
 
-        // Ensure we don't exceed the number of available reward keys
+        int guaranteedRewards = mobDrops.getInt("guaranteed-rewards", 0);
         if (rewardKeys.size() < guaranteedRewards) {
-            logDebug("Not enough reward keys available for guaranteed-rewards: " + guaranteedRewards);
             guaranteedRewards = rewardKeys.size();
         }
 
-        // Randomly shuffle the list of reward keys
-        Collections.shuffle(rewardKeys);
+        int dropsGiven = 0;
 
-        // Guarantee rewards without chance rolls
-        logDebug("Guaranteeing " + guaranteedRewards + " rewards for player: " + player.getName());
-        for (int i = 0; i < guaranteedRewards; i++) {
+        for (int i = 0; i < rewardKeys.size(); i++) {
             String dropKey = rewardKeys.get(i);
             String command = groupDrops.getString(dropKey + ".command");
             String message = groupDrops.getString(dropKey + ".message");
+            double chance = groupDrops.getDouble(dropKey + ".chance", 0.0);
+            double roll = ThreadLocalRandom.current().nextDouble();
 
-            if (command != null && !command.isEmpty()) {
-                // Execute the guaranteed reward
-                boolean commandSuccess = Bukkit.dispatchCommand(
-                        Bukkit.getConsoleSender(),
-                        command.replace("%player%", player.getName())
-                );
-                logDebug("Executed guaranteed reward command for " + dropKey + ": " + command + ", Success: " + commandSuccess);
+            boolean isGuaranteed = i < guaranteedRewards;
 
-                // Send reward message if specified
-                if (message != null && !message.isEmpty()) {
-                    player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
-                    logDebug("Sent reward message to player: " + message);
-                }
-            } else {
-                logDebug("Invalid or missing command for guaranteed reward: " + dropKey + ". Skipping.");
-            }
-        }
+            logDebug("Evaluating drop: " + dropKey + " | Guaranteed: " + isGuaranteed + " | Chance: " + chance + " | Roll: " + roll);
 
-        // Process remaining rewards based on chance
-        logDebug("Processing chance-based rewards for player: " + player.getName());
-        for (String dropKey : rewardKeys.subList(guaranteedRewards, rewardKeys.size())) {
-            double chance = groupDrops.getDouble(dropKey + ".chance", 0.0); // Default chance is 0
-            String command = groupDrops.getString(dropKey + ".command");
-            String message = groupDrops.getString(dropKey + ".message");
-
-            logDebug("Processing chance-based reward " + dropKey + " | Chance: " + chance);
-
-            if (command == null || command.trim().isEmpty()) {
-                logDebug("Invalid or missing command for reward: " + dropKey + ". Skipping.");
+            if (command == null || command.isEmpty()) {
+                logDebug("Skipping " + dropKey + " due to missing command.");
                 continue;
             }
 
-            // Roll the chance for this reward
-            double roll = ThreadLocalRandom.current().nextDouble();
-            logDebug("Reward " + dropKey + ": Roll=" + roll + " | Threshold=" + chance);
+            boolean giveReward = flexibleMode
+                    ? (isGuaranteed || roll <= chance)
+                    : (isGuaranteed || (dropsGiven < guaranteedRewards && roll <= chance));
 
-            if (roll <= chance) {
-                // Execute the reward command
-                boolean commandSuccess = Bukkit.dispatchCommand(
-                        Bukkit.getConsoleSender(),
-                        command.replace("%player%", player.getName())
-                );
-                logDebug("Executed chance-based reward command for " + dropKey + ": " + command.replace("%player%", player.getName()) + ", Success: " + commandSuccess);
+            if (giveReward) {
+                boolean success = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command.replace("%player%", player.getName()));
+                logDebug("Executed command for " + dropKey + ": " + command + " | Success: " + success);
 
-                // Send reward message to the player if configured
                 if (message != null && !message.isEmpty()) {
                     player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
-                    logDebug("Sent reward message to player: " + message);
+                    logDebug("Sent message for reward " + dropKey + ": " + message);
                 }
-            } else {
-                logDebug("Reward " + dropKey + " did not trigger due to chance roll.");
+
+                dropsGiven++;
+
+                if (!flexibleMode && dropsGiven >= guaranteedRewards) {
+                    break;
+                }
             }
         }
 

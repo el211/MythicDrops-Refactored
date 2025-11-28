@@ -47,10 +47,25 @@ public class Top5RewardsHandler {
             return;
         }
 
-        // Sorting by highest damage first
-        List<AbstractEntity> sortedRanking = new ArrayList<>(damageRanking);
-        sortedRanking.sort(Comparator.comparingDouble(activeMob.getThreatTable()::getThreat).reversed());
+        // Filter out null entities before sorting
+        List<AbstractEntity> sortedRanking = new ArrayList<>();
+        for (AbstractEntity entity : damageRanking) {
+            if (entity != null) {
+                sortedRanking.add(entity);
+            } else {
+                logDebug("Skipping null entity in threat table for mob: " + mobName);
+            }
+        }
+
+        if (sortedRanking.isEmpty()) {
+            logDebug("All threat table entities were null for mob: " + mobName);
+            return;
+        }
+
+        // Now safe to sort
+        sortedRanking.sort(Comparator.comparingDouble(e -> activeMob.getThreatTable().getThreat(e)).reversed());
         logDebug("Sorted ranking size: " + sortedRanking.size());
+
 
         boolean useStandardRewards = top5Config.getBoolean(mobName + ".use-standard-rewards", false);
         logDebug("Use standard rewards for mob " + mobName + ": " + useStandardRewards);

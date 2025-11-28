@@ -6,9 +6,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static fr.elias.mythicDrop.MythicDrop.top5Config;
@@ -18,90 +16,97 @@ public class Top5RewardsProcessor {
 
     public static void processTop5RewardsForPlayer(String mobName, String rank, Player player) {
         MythicDrop plugin = MythicDrop.getInstance();
-        long startTime = System.currentTimeMillis(); // Start timing for performance monitoring
+        long startTime = System.currentTimeMillis();
 
         logDebug("Processing top-5 rewards for mob: " + mobName + ", rank: " + rank + ", player: " + player.getName());
 
-        // Check if the rank is configured
-        if (!top5Config.contains(mobName + "." + rank)) {
-            logDebug("No reward configuration for rank: " + rank + " for mob: " + mobName);
-            return;
-        }
-
-        // Fetch the rank-specific section
+        // Check if reward section for this rank exists
         ConfigurationSection rankSection = top5Config.getConfigurationSection(mobName + "." + rank);
         if (rankSection == null) {
-            logDebug("No reward section found for " + mobName + " at rank: " + rank);
+            logDebug("No reward section found for mob: " + mobName + " at rank: " + rank);
             return;
         }
 
-        // Determine the player's primary group
+        // Get primary group (e.g., VIP, default)
         String primaryGroup = plugin.getPrimaryGroup(player);
         logDebug("Player " + player.getName() + " primary group: " + primaryGroup);
 
-        // Fetch group-specific or default drops
+        // Try group section or default
         ConfigurationSection groupDrops = rankSection.contains(primaryGroup)
                 ? rankSection.getConfigurationSection(primaryGroup)
                 : rankSection.getConfigurationSection("default");
+
         if (groupDrops == null) {
-            logDebug("No valid drop configuration found for player group: " + primaryGroup + " or default.");
+            logDebug("No valid drop config found for group " + primaryGroup + " or default.");
             return;
         }
 
-        // Log the keys in the group drops for better visibility
-        logDebug("Reward keys available for player group " + primaryGroup + ": " + groupDrops.getKeys(false));
+        // Determine reward mode
+        boolean flexibleMode = top5Config.getBoolean("rewardtop5-settings.use-flexible-rewards", false);
+        boolean guaranteedPerRank = top5Config.getBoolean(mobName + ".guaranteedperrank", false);
+        boolean perRankGroup = top5Config.getBoolean(mobName + ".per-rank-group", false);
 
-        // Get the guaranteed-rewards value, defaulting to 1 if not set
-        int guaranteedRewards = rankSection.contains("guaranteed-rewards") ? rankSection.getInt("guaranteed-rewards") : 1;
-        logDebug("DEBUG CHECK: guaranteed-rewards for " + mobName + " at rank " + rank + " = " + guaranteedRewards);
-        logDebug("Guaranteed rewards for top-5 rank " + rank + ": " + guaranteedRewards);
+        // Default fallback
+        int guaranteedRewards = top5Config.getInt(mobName + ".guaranteed-rewards.default", 1);
 
-        // Collect potential rewards
+        // Check per-group override
+        if (perRankGroup) {
+            String groupKey = "guaranteed-rewards." + primaryGroup;
+            guaranteedRewards = top5Config.getInt(mobName + "." + groupKey, guaranteedRewards);
+        } else if (guaranteedPerRank) {
+            guaranteedRewards = rankSection.getInt("guaranteed-rewards", guaranteedRewards);
+        }
+
+        logDebug("Flexible mode: " + flexibleMode);
+        logDebug("Guaranteed rewards: " + guaranteedRewards);
+
         List<String> rewardKeys = new ArrayList<>(groupDrops.getKeys(false));
-        List<String> selectedRewards = new ArrayList<>();
+        Collections.shuffle(rewardKeys);  // Randomize reward order
 
-        // Shuffle the rewards list to randomize the selection
-        Collections.shuffle(rewardKeys);
+        int guaranteedGiven = 0;
 
-        // Loop through the shuffled rewards and select up to guaranteedRewards
         for (String dropKey : rewardKeys) {
-            if (selectedRewards.size() >= guaranteedRewards) break;
-
-            double chance = groupDrops.getDouble(dropKey + ".chance", 0.0);
             String command = groupDrops.getString(dropKey + ".command");
             String message = groupDrops.getString(dropKey + ".message");
+            double chance = groupDrops.getDouble(dropKey + ".chance", 0.0);
+            double roll = ThreadLocalRandom.current().nextDouble();
 
-            logDebug("Processing reward " + dropKey + " | Chance: " + chance);
+            boolean isGuaranteed = guaranteedGiven < guaranteedRewards;
+
+            logDebug("Evaluating reward: " + dropKey + " | Guaranteed: " + isGuaranteed + " | Chance: " + chance + " | Roll: " + roll);
 
             if (command == null || command.isEmpty()) {
                 logDebug("Invalid or missing command for reward: " + dropKey + ". Skipping.");
                 continue;
             }
 
-            // Roll the chance and apply the reward if successful
-            double roll = ThreadLocalRandom.current().nextDouble();
-            logDebug("Reward " + dropKey + ": Roll=" + roll + " | Threshold=" + chance);
+            boolean shouldGive = isGuaranteed || roll <= chance;
 
-            if (roll <= chance) {
-                selectedRewards.add(dropKey);
+            if (shouldGive) {
+                boolean success = Bukkit.dispatchCommand(
+                        Bukkit.getConsoleSender(),
+                        command.replace("%player%", player.getName())
+                );
+                logDebug("Executed command for " + dropKey + ": " + command + " | Success: " + success);
 
-                // Execute the command
-                boolean commandSuccess = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command.replace("%player%", player.getName()));
-                logDebug("Executed reward command for " + dropKey + ": " + command.replace("%player%", player.getName()) + ", Success: " + commandSuccess);
-
-                // Send the reward message, if specified
                 if (message != null && !message.isEmpty()) {
                     player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
-                    logDebug("Sent reward message to player: " + message);
-                } else {
-                    logDebug("No message specified for reward: " + dropKey + ".");
+                    logDebug("Sent message to player: " + message);
                 }
-            } else {
-                logDebug("Reward " + dropKey + " did not trigger due to chance roll.");
+
+                if (isGuaranteed) {
+                    guaranteedGiven++;
+                }
+
+                // Legacy mode: stop once we've given enough guaranteed rewards
+                if (!flexibleMode && guaranteedGiven >= guaranteedRewards) {
+                    break;
+                }
             }
         }
 
-        long duration = System.currentTimeMillis() - startTime; // Calculate duration
-        logDebug("Finished processing top-5 rewards for mob: " + mobName + ", rank: " + rank + ", player: " + player.getName() + " in " + duration + " ms.");
+        long duration = System.currentTimeMillis() - startTime;
+        logDebug("Finished processing top-5 rewards for mob: " + mobName + ", rank: " + rank +
+                ", player: " + player.getName() + " in " + duration + " ms.");
     }
 }

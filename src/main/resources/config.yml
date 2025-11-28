@@ -11,6 +11,7 @@ reward-processing:
 #    ThreatTable: true
 # Configuration for different mobs and their drops
 Skeletonking:
+  flexible-reward-mode: false   # <-- if true it enables flexible reward mode for this mob
   drops:
     default:
       drop1:
@@ -40,6 +41,7 @@ Skeletonking:
         message: "&a&lVIP! You received 200 money for defeating the Skeleton King!"
 
 Zombielord:
+  flexible-reward-mode: false   # <-- if true it enables flexible reward mode for this mob
   drops:
     default:
       drop1:

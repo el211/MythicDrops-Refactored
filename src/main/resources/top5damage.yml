@@ -1,11 +1,25 @@
-# Top 5 Damage Configuration
+# Configuration for mobs that use top-5 damage ranking rewards
+# You must set "ThreatTable: true" in the MythicMobs config for these to apply.
+
 rewardtop5:
-  - SkeletonKing
+  - SkeletonKing  # This mob will use the top-5 reward system on death
+
+rewardtop5-settings:
+  use-flexible-rewards: false # true = all rewards are tried by chance
+  # false = legacy mode (stop after guaranteed)
+
 
 SkeletonKing:
-  guaranteed-rewards: 1 # Limit rewards to 1 from the list
-  use-standard-rewards: false
-  first-place:
+  use-standard-rewards: false        # Do not use config.yml rewards for this mob
+  guaranteedperrank: true            # If true, each rank below can define its own guaranteed-rewards
+  per-rank-group: true               # If true, guaranteed-rewards can be set per LuckPerms group
+  guaranteed-rewards:               # Global fallback if guaranteedperrank and per-rank-group are false
+    default: 1
+    VIP: 2
+    legend: 3
+
+  first-place:                       # Rewards for top damager
+    guaranteed-rewards: 1            # Used only if guaranteedperrank is true
     default:
       drop1:
         command: "give %player% diamond 5"
@@ -16,33 +30,41 @@ SkeletonKing:
         command: "give %player% nether_star 1"
         chance: 1.0
         message: "&bVIP Bonus: Nether Star for being the top damager!"
+
   second-place:
+    guaranteed-rewards: 1
     default:
       drop1:
         command: "give %player% emerald 10"
         chance: 0.8
         message: "&aSecond place! Here's 10 emeralds."
+
   third-place:
+    guaranteed-rewards: 1
     default:
       drop1:
         command: "give %player% gold_ingot 15"
         chance: 0.6
         message: "&aThird place! Here's some gold."
+
   fourth-place:
+    guaranteed-rewards: 1
     default:
       drop1:
         command: "give %player% iron_ingot 20"
         chance: 0.5
         message: "&aFourth place! Enjoy your iron!"
+
   fifth-place:
+    guaranteed-rewards: 1
     default:
       drop1:
         command: "give %player% coal 32"
         chance: 0.4
         message: "&aFifth place! Here are some resources."
 
-  everyone-else-who-contributed:
-    min-damage: 50.0 # Minimum damage required to qualify for rewards
+  everyone-else-who-contributed:     # Players outside top-5, but contributed enough damage
+    min-damage: 50.0                 # Minimum damage threshold to qualify
     default:
       drop1:
         command: "give %player% stone 64"
@@ -52,4 +74,3 @@ SkeletonKing:
         command: "give %player% apple 5"
         chance: 0.3
         message: "&cYou got apples as a consolation prize!"
-
