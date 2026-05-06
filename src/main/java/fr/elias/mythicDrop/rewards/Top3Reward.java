@@ -32,7 +32,7 @@ public class Top3Reward implements Reward {
 
         if (useStandardRewards) {
             logDebug("Applying additional standard rewards for " + player.getName());
-            processStandardRewardsForPlayer(player, mobName);
+            processStandardRewardsForPlayer(player, mob);
         }
 
         logDebug("Completed processing top-3 rewards for mob: " + mobName +

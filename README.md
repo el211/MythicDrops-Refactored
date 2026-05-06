@@ -8,13 +8,15 @@
 - Easily configurable through a simple YAML file.
 - Color-coded messages to enhance player experience.
 - LuckPerms support for per-group configured drops!
-- **NEW:** Added Damage Processing option to choose whether the player with the most damage or the last-hit player gets the reward.
+- Damage processing modes for last-hit, most-damage, top-3, and top-5 reward flows.
+- Built-in ranking announcements and configurable death effects.
 
 ## How to Use
-1. Install **MythicDrop** on your Spigot server.
-2. Configure custom drops for each MythicMob in the `config.yml` file.
-3. Customize messages and rewards to match your server's gameplay.
-4. Start slaying MythicMobs and watch as your players enjoy the custom rewards!
+1. Run your 1.21.x Paper/Spigot server on Java 21.
+2. Install **MythicDrop** on your server.
+3. Configure custom drops for each MythicMob in the `config.yml` file.
+4. Customize messages and rewards to match your server's gameplay.
+5. Start slaying MythicMobs and watch as your players enjoy the custom rewards!
 
 ## Configuration Example
 
@@ -22,19 +24,18 @@
 # Reward processing options
 reward-processing:
   most-damage: false   # If true, the player who dealt the most damage will receive the reward
-  # If false, the player who delivers the last hit will receive the reward
+  last-hit: true       # If true, the player who delivers the last hit will receive the reward
 
-# If you set most-damage to true, you have to modify the mythicmobs mob config and add the "ThreatTable: true" option
+# Most-damage, top-3, and top-5 rewards use tracked combat damage directly.
+# No MythicMobs threat table is required for these rankings.
 # Example:
 # BigScaryBoss:
-#   Type: zombie
+#   Type: ZOMBIE
 #   Display: '&6Zombie'
 #   Health: 20000
-#   Modules:
-#     ThreatTable: true
 # Configuration for different mobs and their drops
 
-Skeleton-king:
+SkeletonKing:
   drops:
     default:
       drop1:
@@ -63,7 +64,7 @@ Skeleton-king:
         chance: 0.3
         message: "&a&lVIP! You received 200 money for defeating the Skeleton King!"
 
-Zombie-lord:
+ZombieLord:
   drops:
     default:
       drop1:

@@ -1,45 +1,53 @@
 package fr.elias.mythicDrop.effects;
 
 import fr.elias.mythicDrop.MythicDrop;
-import fr.elias.mythicDrop.effects.EffectRegistry;
-import io.lumine.mythic.bukkit.MythicBukkit;
-import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 import io.lumine.mythic.core.mobs.ActiveMob;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
 
-import java.util.Map;
-import java.util.UUID;
+import java.util.HashMap;
 
-public class EffectListener implements Listener {
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
+import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
-    @EventHandler
-    public void onMobDeath(MythicMobDeathEvent event) {
-        UUID mobId = event.getEntity().getUniqueId();
-        if (!MythicDrop.getInstance().getProcessedMobEvents().add(mobId)) return;
+public final class EffectListener {
 
-        ActiveMob activeMob = MythicBukkit.inst().getMobManager()
-                .getActiveMob(event.getEntity().getUniqueId())
-                .orElse(null);
-        if (activeMob == null) return;
+    private EffectListener() {
+    }
+
+    public static void playConfiguredEffects(ActiveMob activeMob, Location location) {
+        if (activeMob == null || location == null || location.getWorld() == null) {
+            return;
+        }
 
         String mobName = activeMob.getType().getInternalName();
-        ConfigurationSection mobSection = MythicDrop.effectsConfig.getConfigurationSection(mobName + ".effects");
-        if (mobSection == null) return;
+        ConfigurationSection mobRoot = getSectionIgnoreCase(MythicDrop.effectsConfig, mobName);
+        if (mobRoot == null) {
+            return;
+        }
+
+        ConfigurationSection mobSection = mobRoot.getConfigurationSection("effects");
+        if (mobSection == null) {
+            return;
+        }
 
         for (String effectKey : mobSection.getKeys(false)) {
             ConfigurationSection effectData = mobSection.getConfigurationSection(effectKey);
-            if (effectData == null) continue;
+            if (effectData == null) {
+                continue;
+            }
 
             String type = effectData.getString("type");
-            if (type == null || !EffectRegistry.has(type)) continue;
+            if (type == null || !EffectRegistry.has(type)) {
+                logDebug("Skipping unknown effect type '" + type + "' for mob " + mobName + ".");
+                continue;
+            }
 
-            EffectRegistry.get(type).execute(event.getEntity().getLocation(), (Map) effectData.getValues(true));
+            try {
+                EffectRegistry.get(type).execute(location, new HashMap<>(effectData.getValues(false)));
+            } catch (Exception ex) {
+                logDebug("Failed to execute effect '" + effectKey + "' for mob " + mobName + ": " + ex.getMessage());
+            }
         }
     }
-
 }
-

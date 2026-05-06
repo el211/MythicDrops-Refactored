@@ -8,11 +8,13 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
-import java.util.List;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static fr.elias.mythicDrop.utils.ConfigLookup.getGroupSection;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class PlayerRewardsProcessor {
@@ -26,27 +28,25 @@ public class PlayerRewardsProcessor {
         String mobName = activeMob.getType().getInternalName();
         logDebug("Starting reward processing for mob: " + mobName + ", player: " + player.getName() + ", position: " + position);
 
-        if (!config.contains(mobName + ".drops")) {
+        ConfigurationSection mobSection = getSectionIgnoreCase(config, mobName);
+        if (mobSection == null || !mobSection.isConfigurationSection("drops")) {
             logDebug("No drop configuration found for mob: " + mobName);
             return;
         }
 
-        ConfigurationSection mobDrops = config.getConfigurationSection(mobName + ".drops");
+        ConfigurationSection mobDrops = mobSection.getConfigurationSection("drops");
         if (mobDrops == null) {
             logDebug("Failed to retrieve drops section for mob: " + mobName);
             return;
         }
 
-        boolean flexibleMode = config.getBoolean(mobName + ".flexible-reward-mode", false);
+        boolean flexibleMode = mobSection.getBoolean("flexible-reward-mode", false);
         logDebug("Flexible reward mode for " + mobName + ": " + flexibleMode);
 
         String primaryGroup = plugin.getPrimaryGroup(player);
         logDebug("Player " + player.getName() + " belongs to group: " + primaryGroup);
 
-        ConfigurationSection groupDrops = mobDrops.contains(primaryGroup)
-                ? mobDrops.getConfigurationSection(primaryGroup)
-                : mobDrops.getConfigurationSection("default");
-
+        ConfigurationSection groupDrops = getGroupSection(mobDrops, primaryGroup);
         if (groupDrops == null) {
             logDebug("No drop configuration for group: " + primaryGroup + " or default.");
             return;
@@ -55,12 +55,13 @@ public class PlayerRewardsProcessor {
         List<String> rewardKeys = new ArrayList<>(groupDrops.getKeys(false));
         Collections.shuffle(rewardKeys);
 
-        int guaranteedRewards = mobDrops.getInt("guaranteed-rewards", 0);
+        int guaranteedRewards = mobSection.getInt("guaranteed-rewards", 0);
         if (rewardKeys.size() < guaranteedRewards) {
             guaranteedRewards = rewardKeys.size();
         }
 
         int dropsGiven = 0;
+        int guaranteedGiven = 0;
 
         for (int i = 0; i < rewardKeys.size(); i++) {
             String dropKey = rewardKeys.get(i);
@@ -69,8 +70,7 @@ public class PlayerRewardsProcessor {
             double chance = groupDrops.getDouble(dropKey + ".chance", 0.0);
             double roll = ThreadLocalRandom.current().nextDouble();
 
-            boolean isGuaranteed = i < guaranteedRewards;
-
+            boolean isGuaranteed = guaranteedGiven < guaranteedRewards;
             logDebug("Evaluating drop: " + dropKey + " | Guaranteed: " + isGuaranteed + " | Chance: " + chance + " | Roll: " + roll);
 
             if (command == null || command.isEmpty()) {
@@ -78,24 +78,26 @@ public class PlayerRewardsProcessor {
                 continue;
             }
 
-            boolean giveReward = flexibleMode
-                    ? (isGuaranteed || roll <= chance)
-                    : (isGuaranteed || (dropsGiven < guaranteedRewards && roll <= chance));
+            boolean giveReward = isGuaranteed || roll <= chance;
+            if (!giveReward) {
+                continue;
+            }
 
-            if (giveReward) {
-                boolean success = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command.replace("%player%", player.getName()));
-                logDebug("Executed command for " + dropKey + ": " + command + " | Success: " + success);
+            boolean success = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command.replace("%player%", player.getName()));
+            logDebug("Executed command for " + dropKey + ": " + command + " | Success: " + success);
 
-                if (message != null && !message.isEmpty()) {
-                    player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
-                    logDebug("Sent message for reward " + dropKey + ": " + message);
-                }
+            if (message != null && !message.isEmpty()) {
+                player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
+                logDebug("Sent message for reward " + dropKey + ": " + message);
+            }
 
-                dropsGiven++;
+            dropsGiven++;
+            if (isGuaranteed) {
+                guaranteedGiven++;
+            }
 
-                if (!flexibleMode && dropsGiven >= guaranteedRewards) {
-                    break;
-                }
+            if (!flexibleMode && guaranteedRewards > 0 && guaranteedGiven >= guaranteedRewards) {
+                break;
             }
         }
 

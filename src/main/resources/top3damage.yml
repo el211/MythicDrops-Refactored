@@ -1,16 +1,8 @@
 # Configuration for mobs that use top-3 damage rewards
-# You must set "ThreatTable: true" in the MythicMobs config for this to apply
-# Example mob config:
-# BigScaryBoss:
-#   Type: zombie
-#   Display: '&6Zombie'
-#   Health: 20000
-#   Modules:
-#     ThreatTable: true
+# Rankings are based on tracked combat damage, so no MythicMobs threat table is required.
 
 rewardtop3:
   - SkeletalKnight  # List of mobs using top-3 reward logic
-  -
 rewardtop3-settings:
   use-flexible-rewards: true  # true = all rewards are tried by chance
                                 # false = legacy mode (stop after guaranteed)
@@ -19,14 +11,14 @@ rewardtop3-settings:
 SkeletalKnight:
   use-standard-rewards: false        # Skip normal config.yml drops for this mob
   guaranteedperrank: true            # Enables guaranteed-rewards under each rank section
-  per-rank-group: true               # Enables group-based guaranteed reward values
-  guaranteed-rewards:               # Fallback values by permission group
+  per-rank-group: true               # Lets guaranteed-rewards use group-based values when that key is a section
+  guaranteed-rewards:               # Fallback values by permission group if a rank does not override guaranteed-rewards
     default: 1
     vip: 2
     legend: 3
 
   first-place:                       # Player with highest damage dealt
-    guaranteed-rewards: 1            # Used if guaranteedperrank: true
+    guaranteed-rewards: 1            # Used if guaranteedperrank: true; may also be a group section when per-rank-group is true
     default:
       drop1:
         command: "give %player% diamond 3"

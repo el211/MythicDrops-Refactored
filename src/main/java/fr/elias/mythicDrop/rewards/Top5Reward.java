@@ -1,7 +1,6 @@
 // File: src/main/java/fr/elias/mythicDrop/rewards/Top5Reward.java
 package fr.elias.mythicDrop.rewards;
 
-import fr.elias.mythicDrop.MythicDrop;
 import io.lumine.mythic.core.mobs.ActiveMob;
 import org.bukkit.entity.Player;
 
@@ -33,7 +32,7 @@ public class Top5Reward implements Reward {
 
         if (useStandardRewards) {
             logDebug("Applying additional standard rewards for " + player.getName() + " (Top 5).");
-            processStandardRewardsForPlayer(player, mobName);
+            processStandardRewardsForPlayer(player, mob);
         }
 
         logDebug("Completed processing top-5 rewards for mob: " + mobName +

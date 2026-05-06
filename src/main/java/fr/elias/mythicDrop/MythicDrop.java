@@ -3,18 +3,18 @@ package fr.elias.mythicDrop;
 import fr.elias.mythicDrop.commands.MythicDropCommand;
 import fr.elias.mythicDrop.commands.tabCompleters.MythicDropCompleter;
 import fr.elias.mythicDrop.effects.EffectInitializer;
-import fr.elias.mythicDrop.effects.EffectListener;
 import fr.elias.mythicDrop.listeners.MythicMobListener;
 import fr.elias.mythicDrop.utils.Config;
+import fr.elias.mythicDrop.utils.DamageTracker;
 import lombok.Getter;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
+import net.luckperms.api.platform.PlayerAdapter;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
 import java.util.*;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
@@ -62,20 +62,11 @@ public class MythicDrop extends JavaPlugin {
             top3Config = new Config("top3damage.yml");
             top5Config = new Config("top5damage.yml");
             announcementConfig = new Config("announcement.yml");
-
-             // Load effects config
-            // Load effects config only if not already saved
-            File effectsFile = new File(getDataFolder(), "effects.yml");
-            if (!effectsFile.exists()) {
-                saveResource("effects.yml", false);
-                logDebug("Saved default effects.yml to data folder.");
-            }
             effectsConfig = new Config("effects.yml");
 
             // Register listeners
             Bukkit.getPluginManager().registerEvents(new MythicMobListener(), this);
             logDebug("Event listeners registered.");
-            Bukkit.getPluginManager().registerEvents(new EffectListener(), this);
 
             // Register commands and tab completers
             if (this.getCommand("mythicdrop") != null) {
@@ -115,7 +106,10 @@ public class MythicDrop extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // Clean up resources if needed
+        processedMobEvents.clear();
+        processedTop3Events.clear();
+        processedTop5Events.clear();
+        DamageTracker.clearAll();
     }
 
     /**
@@ -132,21 +126,27 @@ public class MythicDrop extends JavaPlugin {
             return "default";
         }
 
-        // Attempt to fetch the LuckPerms user
-        User user = luckPerms.getUserManager().getUser(player.getUniqueId());
-        if (user != null) {
-            logDebug("LuckPerms user found for player: " + player.getName());
-
-            // Attempt to fetch the primary group
-            String primaryGroup = user.getPrimaryGroup();
-            if (!primaryGroup.isEmpty()) {
-                logDebug("Fetched primary group for player: " + player.getName() + " - " + primaryGroup);
+        try {
+            PlayerAdapter<Player> playerAdapter = luckPerms.getPlayerAdapter(Player.class);
+            String primaryGroup = playerAdapter.getMetaData(player).getPrimaryGroup();
+            if (primaryGroup != null && !primaryGroup.isEmpty()) {
+                logDebug("Fetched primary group from LuckPerms metadata for player: " + player.getName() + " - " + primaryGroup);
                 return primaryGroup;
-            } else {
-                logDebug("Primary group for player: " + player.getName() + " is null or empty. Using default group.");
             }
-        } else {
-            logDebug("No LuckPerms user found for player: " + player.getName() + ". Using default group.");
+
+            User liveUser = playerAdapter.getUser(player);
+            if (liveUser != null && !liveUser.getPrimaryGroup().isEmpty()) {
+                logDebug("Fetched primary group from LuckPerms live user for player: " + player.getName() + " - " + liveUser.getPrimaryGroup());
+                return liveUser.getPrimaryGroup();
+            }
+        } catch (Exception e) {
+            logDebug("Failed to fetch LuckPerms metadata for player: " + player.getName() + " - " + e.getMessage());
+        }
+
+        User cachedUser = luckPerms.getUserManager().getUser(player.getUniqueId());
+        if (cachedUser != null && !cachedUser.getPrimaryGroup().isEmpty()) {
+            logDebug("Fetched primary group from LuckPerms cached user for player: " + player.getName() + " - " + cachedUser.getPrimaryGroup());
+            return cachedUser.getPrimaryGroup();
         }
 
         // Default fallback

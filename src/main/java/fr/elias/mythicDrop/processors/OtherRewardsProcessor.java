@@ -10,26 +10,26 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import static fr.elias.mythicDrop.MythicDrop.top3Config;
 import static fr.elias.mythicDrop.MythicDrop.top5Config;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getGroupSection;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class OtherRewardsProcessor {
 
     public static void processEveryoneElseRewards(String mobName, Player player, double playerDamage) {
         MythicDrop plugin = MythicDrop.getInstance();
-        // Ensure the player and their name are valid
         if (player == null) {
             logDebug("Player or player name is null. Skipping reward processing.");
             return;
-        } else {
-            player.getName();
         }
 
         logDebug("Processing rewards for everyone else who contributed for mob: " + mobName + ", player: " + player.getName());
 
-        // Determine the appropriate configuration section (top5Config or top3Config)
-        ConfigurationSection everyoneElseConfig = top5Config.getConfigurationSection(mobName + ".everyone-else-who-contributed");
+        ConfigurationSection top5MobSection = getSectionIgnoreCase(top5Config, mobName);
+        ConfigurationSection everyoneElseConfig = top5MobSection == null ? null : top5MobSection.getConfigurationSection("everyone-else-who-contributed");
         if (everyoneElseConfig == null) {
-            everyoneElseConfig = top3Config.getConfigurationSection(mobName + ".everyone-else-who-contributed");
+            ConfigurationSection top3MobSection = getSectionIgnoreCase(top3Config, mobName);
+            everyoneElseConfig = top3MobSection == null ? null : top3MobSection.getConfigurationSection("everyone-else-who-contributed");
         }
 
         if (everyoneElseConfig == null) {
@@ -37,34 +37,26 @@ public class OtherRewardsProcessor {
             return;
         }
 
-        // Check for the minimum damage threshold
-        double minDamage = everyoneElseConfig.getDouble("min-damage", 0.0); // Default to 0.0
+        double minDamage = everyoneElseConfig.getDouble("min-damage", 0.0);
         if (playerDamage < minDamage) {
             logDebug("Player " + player.getName() + " did not meet the min-damage threshold (" + minDamage + "). Skipping rewards.");
             return;
         }
 
-        // Determine the player's primary group using LuckPerms
         String primaryGroup = plugin.getPrimaryGroup(player);
         logDebug("Player " + player.getName() + " primary group: " + primaryGroup);
 
-        // Fetch group-specific drops or fallback to the default section
-        ConfigurationSection groupDrops = everyoneElseConfig.getConfigurationSection(primaryGroup);
-        ConfigurationSection effectiveGroupDrops = (groupDrops != null) ? groupDrops : everyoneElseConfig.getConfigurationSection("default");
-
-        // Check if there are valid drops configured
+        ConfigurationSection effectiveGroupDrops = getGroupSection(everyoneElseConfig, primaryGroup);
         if (effectiveGroupDrops == null) {
             logDebug("No valid drop configuration found for player group: " + primaryGroup + " or default.");
             return;
         }
 
-        // Process each drop in the configuration
         effectiveGroupDrops.getKeys(false).forEach(dropKey -> {
-            double chance = effectiveGroupDrops.getDouble(dropKey + ".chance", 0.0); // Default to 0.0 chance if not configured
-            double roll = ThreadLocalRandom.current().nextDouble(); // Thread-safe random number generation
+            double chance = effectiveGroupDrops.getDouble(dropKey + ".chance", 0.0);
+            double roll = ThreadLocalRandom.current().nextDouble();
             logDebug("Processing reward " + dropKey + " for player: " + player.getName() + " | Roll: " + roll + " | Chance: " + chance);
 
-            // Check if the reward should trigger
             if (roll <= chance) {
                 String command = effectiveGroupDrops.getString(dropKey + ".command");
                 if (command == null || command.trim().isEmpty()) {
@@ -72,11 +64,9 @@ public class OtherRewardsProcessor {
                     return;
                 }
 
-                // Execute the reward command
                 boolean success = Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command.replace("%player%", player.getName()));
                 logDebug("Executed reward command: " + command.replace("%player%", player.getName()) + " | Success: " + success);
 
-                // Send a message to the player if configured
                 String message = effectiveGroupDrops.getString(dropKey + ".message");
                 if (message != null && !message.isEmpty()) {
                     player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));

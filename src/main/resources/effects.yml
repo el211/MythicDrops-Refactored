@@ -5,6 +5,7 @@ SkeletonKing:
       power: 2
       color: BLUE
       flicker: true
+      trail: true
 
     death_sound:
       type: SOUND

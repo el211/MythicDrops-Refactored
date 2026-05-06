@@ -6,10 +6,15 @@ import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static fr.elias.mythicDrop.MythicDrop.top5Config;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getGroupSection;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
+import static fr.elias.mythicDrop.utils.ConfigLookup.resolveKeyIgnoreCase;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class Top5RewardsProcessor {
@@ -20,48 +25,36 @@ public class Top5RewardsProcessor {
 
         logDebug("Processing top-5 rewards for mob: " + mobName + ", rank: " + rank + ", player: " + player.getName());
 
-        // Check if reward section for this rank exists
-        ConfigurationSection rankSection = top5Config.getConfigurationSection(mobName + "." + rank);
-        if (rankSection == null) {
+        ConfigurationSection mobSection = getSectionIgnoreCase(top5Config, mobName);
+        ConfigurationSection rankSection = mobSection == null ? null : getSectionIgnoreCase(mobSection, rank);
+        if (rankSection == null || mobSection == null) {
             logDebug("No reward section found for mob: " + mobName + " at rank: " + rank);
             return;
         }
 
-        // Get primary group (e.g., VIP, default)
         String primaryGroup = plugin.getPrimaryGroup(player);
         logDebug("Player " + player.getName() + " primary group: " + primaryGroup);
 
-        // Try group section or default
-        ConfigurationSection groupDrops = rankSection.contains(primaryGroup)
-                ? rankSection.getConfigurationSection(primaryGroup)
-                : rankSection.getConfigurationSection("default");
-
+        ConfigurationSection groupDrops = getGroupSection(rankSection, primaryGroup);
         if (groupDrops == null) {
             logDebug("No valid drop config found for group " + primaryGroup + " or default.");
             return;
         }
 
-        // Determine reward mode
         boolean flexibleMode = top5Config.getBoolean("rewardtop5-settings.use-flexible-rewards", false);
-        boolean guaranteedPerRank = top5Config.getBoolean(mobName + ".guaranteedperrank", false);
-        boolean perRankGroup = top5Config.getBoolean(mobName + ".per-rank-group", false);
+        boolean guaranteedPerRank = mobSection.getBoolean("guaranteedperrank", false);
+        boolean perRankGroup = mobSection.getBoolean("per-rank-group", false);
 
-        // Default fallback
-        int guaranteedRewards = top5Config.getInt(mobName + ".guaranteed-rewards.default", 1);
-
-        // Check per-group override
-        if (perRankGroup) {
-            String groupKey = "guaranteed-rewards." + primaryGroup;
-            guaranteedRewards = top5Config.getInt(mobName + "." + groupKey, guaranteedRewards);
-        } else if (guaranteedPerRank) {
-            guaranteedRewards = rankSection.getInt("guaranteed-rewards", guaranteedRewards);
-        }
+        int guaranteedRewards = resolveGuaranteedRewards(mobSection, rankSection, primaryGroup, guaranteedPerRank, perRankGroup);
 
         logDebug("Flexible mode: " + flexibleMode);
         logDebug("Guaranteed rewards: " + guaranteedRewards);
 
         List<String> rewardKeys = new ArrayList<>(groupDrops.getKeys(false));
-        Collections.shuffle(rewardKeys);  // Randomize reward order
+        Collections.shuffle(rewardKeys);
+        if (rewardKeys.size() < guaranteedRewards) {
+            guaranteedRewards = rewardKeys.size();
+        }
 
         int guaranteedGiven = 0;
 
@@ -72,7 +65,6 @@ public class Top5RewardsProcessor {
             double roll = ThreadLocalRandom.current().nextDouble();
 
             boolean isGuaranteed = guaranteedGiven < guaranteedRewards;
-
             logDebug("Evaluating reward: " + dropKey + " | Guaranteed: " + isGuaranteed + " | Chance: " + chance + " | Roll: " + roll);
 
             if (command == null || command.isEmpty()) {
@@ -81,7 +73,6 @@ public class Top5RewardsProcessor {
             }
 
             boolean shouldGive = isGuaranteed || roll <= chance;
-
             if (shouldGive) {
                 boolean success = Bukkit.dispatchCommand(
                         Bukkit.getConsoleSender(),
@@ -98,8 +89,7 @@ public class Top5RewardsProcessor {
                     guaranteedGiven++;
                 }
 
-                // Legacy mode: stop once we've given enough guaranteed rewards
-                if (!flexibleMode && guaranteedGiven >= guaranteedRewards) {
+                if (!flexibleMode && guaranteedRewards > 0 && guaranteedGiven >= guaranteedRewards) {
                     break;
                 }
             }
@@ -108,5 +98,43 @@ public class Top5RewardsProcessor {
         long duration = System.currentTimeMillis() - startTime;
         logDebug("Finished processing top-5 rewards for mob: " + mobName + ", rank: " + rank +
                 ", player: " + player.getName() + " in " + duration + " ms.");
+    }
+
+    private static int resolveGuaranteedRewards(ConfigurationSection mobSection,
+                                                ConfigurationSection rankSection,
+                                                String primaryGroup,
+                                                boolean guaranteedPerRank,
+                                                boolean perRankGroup) {
+        int guaranteedRewards = resolveGuaranteedValue(mobSection, perRankGroup ? primaryGroup : null, 1);
+        if (guaranteedPerRank) {
+            guaranteedRewards = resolveGuaranteedValue(rankSection, perRankGroup ? primaryGroup : null, guaranteedRewards);
+        } else if (perRankGroup) {
+            guaranteedRewards = resolveGuaranteedValue(mobSection, primaryGroup, guaranteedRewards);
+        }
+        return Math.max(0, guaranteedRewards);
+    }
+
+    private static int resolveGuaranteedValue(ConfigurationSection section, String primaryGroup, int fallback) {
+        if (section == null || !section.contains("guaranteed-rewards")) {
+            return fallback;
+        }
+
+        if (section.isConfigurationSection("guaranteed-rewards")) {
+            ConfigurationSection guaranteedRewardsSection = section.getConfigurationSection("guaranteed-rewards");
+            if (guaranteedRewardsSection == null) {
+                return fallback;
+            }
+
+            if (primaryGroup != null) {
+                String resolvedGroupKey = resolveKeyIgnoreCase(guaranteedRewardsSection, primaryGroup);
+                if (resolvedGroupKey != null) {
+                    return guaranteedRewardsSection.getInt(resolvedGroupKey, fallback);
+                }
+            }
+
+            return guaranteedRewardsSection.getInt("default", fallback);
+        }
+
+        return section.getInt("guaranteed-rewards", fallback);
     }
 }

@@ -12,6 +12,9 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static fr.elias.mythicDrop.MythicDrop.top3Config;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getGroupSection;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
+import static fr.elias.mythicDrop.utils.ConfigLookup.resolveKeyIgnoreCase;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class Top3RewardsProcessor {
@@ -22,13 +25,8 @@ public class Top3RewardsProcessor {
 
         logDebug("Starting processing top-3 rewards for mob: " + mobName + ", rank: " + rank + ", player: " + player.getName());
 
-        if (!top3Config.contains(mobName + "." + rank)) {
-            logDebug("No rewards configured for " + rank + " of mob: " + mobName);
-            return;
-        }
-
-        ConfigurationSection mobSection = top3Config.getConfigurationSection(mobName);
-        ConfigurationSection rankSection = top3Config.getConfigurationSection(mobName + "." + rank);
+        ConfigurationSection mobSection = getSectionIgnoreCase(top3Config, mobName);
+        ConfigurationSection rankSection = mobSection == null ? null : getSectionIgnoreCase(mobSection, rank);
         if (rankSection == null || mobSection == null) {
             logDebug("Missing configuration section for " + mobName + " or rank " + rank);
             return;
@@ -37,34 +35,30 @@ public class Top3RewardsProcessor {
         String primaryGroup = plugin.getPrimaryGroup(player);
         logDebug("Player " + player.getName() + " belongs to group: " + primaryGroup);
 
-        ConfigurationSection groupDrops = rankSection.contains(primaryGroup)
-                ? rankSection.getConfigurationSection(primaryGroup)
-                : rankSection.getConfigurationSection("default");
-
+        ConfigurationSection groupDrops = getGroupSection(rankSection, primaryGroup);
         if (groupDrops == null) {
             logDebug("No drop config found for group " + primaryGroup + " or 'default'");
             return;
         }
 
-        // NEW: Global toggle for flexible mode
         boolean useFlexible = top3Config.getBoolean("rewardtop3-settings.use-flexible-rewards", false);
         logDebug("Flexible reward mode: " + useFlexible);
 
         boolean guaranteedPerRank = mobSection.getBoolean("guaranteedperrank", false);
         boolean perRankGroup = mobSection.getBoolean("per-rank-group", false);
 
-        int guaranteedRewards = mobSection.getInt("guaranteed-rewards.default", 1);
-        if (perRankGroup) {
-            guaranteedRewards = mobSection.getInt("guaranteed-rewards." + primaryGroup, guaranteedRewards);
-        } else if (guaranteedPerRank) {
-            guaranteedRewards = rankSection.getInt("guaranteed-rewards", guaranteedRewards);
-        }
+        int guaranteedRewards = resolveGuaranteedRewards(mobSection, rankSection, primaryGroup, guaranteedPerRank, perRankGroup);
 
         logDebug("Final guaranteedRewards = " + guaranteedRewards);
 
         List<String> rewardKeys = new ArrayList<>(groupDrops.getKeys(false));
         Collections.shuffle(rewardKeys);
+        if (rewardKeys.size() < guaranteedRewards) {
+            guaranteedRewards = rewardKeys.size();
+        }
+
         int given = 0;
+        int guaranteedGiven = 0;
 
         for (int i = 0; i < rewardKeys.size(); i++) {
             String dropKey = rewardKeys.get(i);
@@ -73,8 +67,7 @@ public class Top3RewardsProcessor {
             double chance = groupDrops.getDouble(dropKey + ".chance", 0.0);
             double roll = ThreadLocalRandom.current().nextDouble();
 
-            boolean isGuaranteed = i < guaranteedRewards;
-
+            boolean isGuaranteed = guaranteedGiven < guaranteedRewards;
             logDebug("Reward " + dropKey + " | Guaranteed: " + isGuaranteed + " | Chance: " + chance + " | Roll: " + roll);
 
             if (command == null || command.isEmpty()) {
@@ -95,9 +88,11 @@ public class Top3RewardsProcessor {
                 }
 
                 given++;
+                if (isGuaranteed) {
+                    guaranteedGiven++;
+                }
 
-                // 🚨 OLD mode: break after hitting guaranteed number
-                if (!useFlexible && given >= guaranteedRewards) {
+                if (!useFlexible && guaranteedRewards > 0 && guaranteedGiven >= guaranteedRewards) {
                     logDebug("Reached guaranteed rewards limit. Breaking loop.");
                     break;
                 }
@@ -106,5 +101,43 @@ public class Top3RewardsProcessor {
 
         long duration = System.currentTimeMillis() - startTime;
         logDebug("Finished Top-3 rewards for " + mobName + " rank " + rank + " in " + duration + " ms.");
+    }
+
+    private static int resolveGuaranteedRewards(ConfigurationSection mobSection,
+                                                ConfigurationSection rankSection,
+                                                String primaryGroup,
+                                                boolean guaranteedPerRank,
+                                                boolean perRankGroup) {
+        int guaranteedRewards = resolveGuaranteedValue(mobSection, perRankGroup ? primaryGroup : null, 1);
+        if (guaranteedPerRank) {
+            guaranteedRewards = resolveGuaranteedValue(rankSection, perRankGroup ? primaryGroup : null, guaranteedRewards);
+        } else if (perRankGroup) {
+            guaranteedRewards = resolveGuaranteedValue(mobSection, primaryGroup, guaranteedRewards);
+        }
+        return Math.max(0, guaranteedRewards);
+    }
+
+    private static int resolveGuaranteedValue(ConfigurationSection section, String primaryGroup, int fallback) {
+        if (section == null || !section.contains("guaranteed-rewards")) {
+            return fallback;
+        }
+
+        if (section.isConfigurationSection("guaranteed-rewards")) {
+            ConfigurationSection guaranteedRewardsSection = section.getConfigurationSection("guaranteed-rewards");
+            if (guaranteedRewardsSection == null) {
+                return fallback;
+            }
+
+            if (primaryGroup != null) {
+                String resolvedGroupKey = resolveKeyIgnoreCase(guaranteedRewardsSection, primaryGroup);
+                if (resolvedGroupKey != null) {
+                    return guaranteedRewardsSection.getInt(resolvedGroupKey, fallback);
+                }
+            }
+
+            return guaranteedRewardsSection.getInt("default", fallback);
+        }
+
+        return section.getInt("guaranteed-rewards", fallback);
     }
 }

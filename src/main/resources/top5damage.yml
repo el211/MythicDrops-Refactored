@@ -1,5 +1,5 @@
 # Configuration for mobs that use top-5 damage ranking rewards
-# You must set "ThreatTable: true" in the MythicMobs config for these to apply.
+# Rankings are based on tracked combat damage, so no MythicMobs threat table is required.
 
 rewardtop5:
   - SkeletonKing  # This mob will use the top-5 reward system on death
@@ -12,20 +12,20 @@ rewardtop5-settings:
 SkeletonKing:
   use-standard-rewards: false        # Do not use config.yml rewards for this mob
   guaranteedperrank: true            # If true, each rank below can define its own guaranteed-rewards
-  per-rank-group: true               # If true, guaranteed-rewards can be set per LuckPerms group
-  guaranteed-rewards:               # Global fallback if guaranteedperrank and per-rank-group are false
+  per-rank-group: true               # If true, guaranteed-rewards can be a group section instead of a single number
+  guaranteed-rewards:               # Global fallback by group if a rank does not override guaranteed-rewards
     default: 1
-    VIP: 2
+    vip: 2
     legend: 3
 
   first-place:                       # Rewards for top damager
-    guaranteed-rewards: 1            # Used only if guaranteedperrank is true
+    guaranteed-rewards: 1            # Used if guaranteedperrank is true; may also be a group section when per-rank-group is true
     default:
       drop1:
         command: "give %player% diamond 5"
         chance: 1.0
         message: "&aYou are the top damager! Enjoy your diamonds!"
-    VIP:
+    vip:
       drop1:
         command: "give %player% nether_star 1"
         chance: 1.0

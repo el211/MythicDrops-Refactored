@@ -1,32 +1,40 @@
-// File: src/main/java/fr/elias/mythicDrop/processors/StandardRewardProcessor.java
 package fr.elias.mythicDrop.processors;
 
 import fr.elias.mythicDrop.MythicDrop;
+import io.lumine.mythic.core.mobs.ActiveMob;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
+import static fr.elias.mythicDrop.processors.PlayerRewardsProcessor.processRewardsForPlayer;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class StandardRewardProcessor {
 
-    public static void processStandardRewardsForPlayer(Player player, String mobName) {
+    public static void processStandardRewardsForPlayer(Player player, ActiveMob mob) {
+        String mobName = mob.getType().getInternalName();
         FileConfiguration config = MythicDrop.getInstance().getConfig();
-        ConfigurationSection standardRewards = config.getConfigurationSection(mobName + ".standard-rewards");
+        ConfigurationSection mobSection = getSectionIgnoreCase(config, mobName);
+        ConfigurationSection standardRewards = mobSection == null ? null : mobSection.getConfigurationSection("standard-rewards");
 
-        if (standardRewards == null) {
-            logDebug("No standard rewards defined for mob: " + mobName);
+        if (standardRewards != null) {
+            logDebug("Processing legacy standard-rewards section for mob: " + mobName);
+            processLegacyStandardRewards(player, standardRewards);
             return;
         }
 
-        for (String dropKey : standardRewards.getKeys(false)) {
-            String path = mobName + ".standard-rewards." + dropKey;
+        logDebug("No standard-rewards section found for mob " + mobName + ". Falling back to config.yml drops.");
+        processRewardsForPlayer(mob, player, 1);
+    }
 
-            String command = config.getString(path + ".command");
-            String message = config.getString(path + ".message");
-            double chance = config.getDouble(path + ".chance", 0.0);
+    private static void processLegacyStandardRewards(Player player, ConfigurationSection standardRewards) {
+        for (String dropKey : standardRewards.getKeys(false)) {
+            String command = standardRewards.getString(dropKey + ".command");
+            String message = standardRewards.getString(dropKey + ".message");
+            double chance = standardRewards.getDouble(dropKey + ".chance", 0.0);
 
             if (command == null || command.trim().isEmpty()) {
                 logDebug("Skipping drop " + dropKey + ": Missing command.");

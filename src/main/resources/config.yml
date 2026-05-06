@@ -1,16 +1,17 @@
 # Reward processing options
 reward-processing:
   most-damage: false   # If true, the player who dealt the most damage will receive the reward
-  # If false, the player who delivers the last hit will receive the reward
-#If you set most-damage to true, you have to modify the mythicmobs mob config and add the "ThreatTable: true" option here is an example:
+  last-hit: true       # If true, the player who delivers the last hit will receive the reward when top-3/top-5 is not used
+# Most-damage, top-3, and top-5 modes now use tracked combat damage directly.
+# No MythicMobs threat table is required for ranking rewards or announcements.
+# Use the exact MythicMobs internal mob name as the section key below.
+# Example:
 #BigScaryBoss:
-#  Type: zombie
+#  Type: ZOMBIE
 #  Display: '&6Zombie'
 #  Health: 20000
-#  Modules:
-#    ThreatTable: true
 # Configuration for different mobs and their drops
-Skeletonking:
+SkeletonKing:
   flexible-reward-mode: false   # <-- if true it enables flexible reward mode for this mob
   drops:
     default:
@@ -40,7 +41,7 @@ Skeletonking:
         chance: 0.3
         message: "&a&lVIP! You received 200 money for defeating the Skeleton King!"
 
-Zombielord:
+ZombieLord:
   flexible-reward-mode: false   # <-- if true it enables flexible reward mode for this mob
   drops:
     default:

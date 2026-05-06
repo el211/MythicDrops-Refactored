@@ -1,17 +1,20 @@
 package fr.elias.mythicDrop.handlers;
 
 import fr.elias.mythicDrop.MythicDrop;
+import fr.elias.mythicDrop.rewards.EveryoneElseReward;
 import fr.elias.mythicDrop.rewards.RewardProcessor;
 import fr.elias.mythicDrop.rewards.Top3Reward;
-import fr.elias.mythicDrop.rewards.EveryoneElseReward;
-import io.lumine.mythic.api.adapters.AbstractEntity;
+import fr.elias.mythicDrop.utils.DamageTracker;
 import io.lumine.mythic.core.mobs.ActiveMob;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 
 import static fr.elias.mythicDrop.MythicDrop.top3Config;
-import static fr.elias.mythicDrop.announcers.AnnounceDamageRanking.announceDamageRanking;
+import static fr.elias.mythicDrop.utils.ConfigLookup.getSectionIgnoreCase;
+import static fr.elias.mythicDrop.utils.ConfigLookup.listContainsIgnoreCase;
 import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class Top3RewardsHandler {
@@ -28,103 +31,76 @@ public class Top3RewardsHandler {
         }
         plugin.getProcessedTop3Events().add(mobId);
 
-        logDebug("Executing Top 3 rewards for mob: " + mobName);
+        try {
+            logDebug("Executing Top 3 rewards for mob: " + mobName);
 
-        List<String> rewardTop3Mobs = top3Config.getStringList("rewardtop3");
-        if (!rewardTop3Mobs.contains(mobName)) {
-            logDebug("Mob " + mobName + " is not configured for top-3 rewards. Skipping.");
-            return;
-        }
-
-        if (!activeMob.hasThreatTable()) {
-            logDebug("No Threat Table found for mob: " + mobName);
-            return;
-        }
-
-        Set<AbstractEntity> damageRanking = activeMob.getThreatTable().getAllThreatTargets();
-        if (damageRanking.isEmpty()) {
-            logDebug("No players contributed damage to the mob: " + mobName);
-            return;
-        }
-
-        List<AbstractEntity> sortedRanking = new ArrayList<>();
-        for (AbstractEntity entity : damageRanking) {
-            if (entity != null) {
-                sortedRanking.add(entity);
-            } else {
-                logDebug("Skipping null entity in threat table before sorting.");
-            }
-        }
-        sortedRanking.sort(Comparator.comparingDouble(activeMob.getThreatTable()::getThreat).reversed());
-
-        logDebug("Sorted ranking size: " + sortedRanking.size());
-
-        if (!top3Config.contains(mobName)) {
-            logDebug("No specific top-3 rewards configured for mob: " + mobName);
-            return;
-        }
-
-        boolean useStandardRewards = top3Config.getBoolean(mobName + ".use-standard-rewards", false);
-        logDebug("Use standard rewards for mob " + mobName + ": " + useStandardRewards);
-
-        String[] ranks = {"first-place", "second-place", "third-place"};
-
-        for (int i = 0; i < Math.min(3, sortedRanking.size()); i++) {
-            AbstractEntity entity = sortedRanking.get(i);
-            if (entity == null) {
-                logDebug("Skipping null entity at rank " + i);
-                continue;
+            if (!listContainsIgnoreCase(top3Config.getStringList("rewardtop3"), mobName)) {
+                logDebug("Mob " + mobName + " is not configured for top-3 rewards. Skipping.");
+                return;
             }
 
-            if (!entity.isPlayer()) {
-                logDebug("Entity at rank " + i + " is not a player. Skipping.");
-                continue;
+            List<DamageTracker.DamageEntry> sortedRanking = DamageTracker.getSortedDamageRanking(activeMob.getUniqueId());
+            if (sortedRanking.isEmpty()) {
+                logDebug("No players contributed damage to the mob: " + mobName);
+                return;
             }
 
-            Player player = (Player) entity.asPlayer().getBukkitEntity();
-            String rank = ranks[i];
+            logDebug("Sorted ranking size: " + sortedRanking.size());
 
-            logDebug("Rewarding player " + player.getName() + " for " + rank +
-                    (useStandardRewards ? " (with standard rewards)" : ""));
+            ConfigurationSection mobSection = getSectionIgnoreCase(top3Config, mobName);
+            if (mobSection == null) {
+                logDebug("No specific top-3 rewards configured for mob: " + mobName);
+                return;
+            }
 
-            new RewardProcessor(new Top3Reward(rank, useStandardRewards)).execute(player, activeMob);
+            boolean useStandardRewards = mobSection.getBoolean("use-standard-rewards", false);
+            logDebug("Use standard rewards for mob " + mobName + ": " + useStandardRewards);
+
+            String[] ranks = {"first-place", "second-place", "third-place"};
+
+            for (int i = 0; i < Math.min(3, sortedRanking.size()); i++) {
+                DamageTracker.DamageEntry damageEntry = sortedRanking.get(i);
+                Player player = DamageTracker.getOnlinePlayer(damageEntry);
+                if (player == null) {
+                    logDebug("Player at rank " + (i + 1) + " is no longer online for mob " + mobName + ".");
+                    continue;
+                }
+
+                String rank = ranks[i];
+                logDebug("Rewarding player " + player.getName() + " for " + rank +
+                        (useStandardRewards ? " (with standard rewards)" : ""));
+
+                new RewardProcessor(new Top3Reward(rank, useStandardRewards)).execute(player, activeMob);
+            }
+
+            ConfigurationSection everyoneElseSection = mobSection.getConfigurationSection("everyone-else-who-contributed");
+            double minDamage = everyoneElseSection == null ? 0.0 : everyoneElseSection.getDouble("min-damage", 0.0);
+            logDebug("Minimum damage for 'everyone else' rewards: " + minDamage);
+
+            int otherPlayersCount = 0;
+            for (int i = 3; i < sortedRanking.size(); i++) {
+                DamageTracker.DamageEntry damageEntry = sortedRanking.get(i);
+                Player player = DamageTracker.getOnlinePlayer(damageEntry);
+                if (player == null) {
+                    continue;
+                }
+
+                double playerDamage = damageEntry.getDamage();
+                if (playerDamage >= minDamage) {
+                    logDebug("Rewarding player " + player.getName() + " for contributing with damage: " + playerDamage);
+                    new RewardProcessor(new EveryoneElseReward(playerDamage)).execute(player, activeMob);
+                    otherPlayersCount++;
+                } else {
+                    logDebug("Player " + player.getName() + " did not meet min-damage threshold (" + minDamage + "). Skipping.");
+                }
+            }
+
+            logDebug("Total 'everyone else' rewards given: " + otherPlayersCount);
+
+            long duration = System.currentTimeMillis() - startTime;
+            logDebug("handleTop3Rewards for mob " + mobName + " executed in " + duration + " ms.");
+        } finally {
+            plugin.getProcessedTop3Events().remove(mobId);
         }
-
-        double minDamage = top3Config.getDouble(mobName + ".everyone-else-who-contributed.min-damage", 0.0);
-        logDebug("Minimum damage for 'everyone else' rewards: " + minDamage);
-
-        int otherPlayersCount = 0;
-        for (int i = 3; i < sortedRanking.size(); i++) {
-            AbstractEntity entity = sortedRanking.get(i);
-
-            if (entity == null) {
-                logDebug("Skipping null entity in 'everyone else' block at index " + i);
-                continue;
-            }
-
-            if (!entity.isPlayer()) {
-                logDebug("Entity at index " + i + " is not a player. Skipping.");
-                continue;
-            }
-
-            Player player = (Player) entity.asPlayer().getBukkitEntity();
-            double playerDamage = activeMob.getThreatTable().getThreat(entity);
-
-            if (playerDamage >= minDamage) {
-                logDebug("Rewarding player " + player.getName() + " for contributing with damage: " + playerDamage);
-                new RewardProcessor(new EveryoneElseReward(playerDamage)).execute(player, activeMob);
-                otherPlayersCount++;
-            } else {
-                logDebug("Player " + player.getName() + " did not meet min-damage threshold (" + minDamage + "). Skipping.");
-            }
-        }
-
-        logDebug("Total 'everyone else' rewards given: " + otherPlayersCount);
-        logDebug("Announcing damage ranking for mob: " + mobName);
-        announceDamageRanking(activeMob);
-
-        long duration = System.currentTimeMillis() - startTime;
-        logDebug("handleTop3Rewards for mob " + mobName + " executed in " + duration + " ms.");
-        plugin.getProcessedTop3Events().remove(mobId);
     }
 }
