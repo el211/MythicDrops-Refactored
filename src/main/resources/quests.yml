@@ -1,0 +1,127 @@
+quests:
+  kill_cave_spider:
+    mob-name: "CAVE_SPIDER"
+    message: "&aQuest complete! The cave spiders fear you no more."
+    quest-item:
+      material: SPIDER_EYE
+      ModelData: 0
+      displayname: "&2Cave Spider Slayer"
+      lore:
+        - "&7Venture into the dark and slay"
+        - "&7Cave Spiders."
+        - "&7Required kills: &f10"
+    conditions:
+      kill: 10
+      slot: 11
+    reward:
+      drops:
+        default:
+          guaranteed-rewards: 1
+          reward1:
+            command: "give %player% string 8"
+            chance: 1.0
+            message: "&aYou received 8 String!"
+          reward2:
+            command: "give %player% spider_eye 4"
+            chance: 0.5
+            message: "&aBonus: 4 Spider Eyes!"
+        vip:
+          guaranteed-rewards: 1
+          reward1:
+            command: "give %player% string 16"
+            chance: 1.0
+            message: "&b[VIP] You received 16 String!"
+          reward2:
+            command: "give %player% spider_eye 8"
+            chance: 0.75
+            message: "&b[VIP] Bonus: 8 Spider Eyes!"
+
+  kill_wither_skeleton:
+    mob-name: "WITHER_SKELETON"
+    message: "&aQuest complete! The Nether trembles at your name."
+    quest-item:
+      material: WITHER_SKELETON_SKULL
+      ModelData: 0
+      displayname: "&8Wither Skeleton Hunter"
+      lore:
+        - "&7Brave the Nether fortress and"
+        - "&7destroy the Wither Skeletons."
+        - "&7Required kills: &f7"
+    conditions:
+      kill: 7
+      slot: 12
+    reward:
+      drops:
+        default:
+          guaranteed-rewards: 1
+          reward1:
+            command: "give %player% coal 16"
+            chance: 1.0
+            message: "&aYou received 16 Coal!"
+          reward2:
+            command: "give %player% bone 8"
+            chance: 0.6
+            message: "&aBonus: 8 Bones!"
+          reward3:
+            command: "give %player% wither_skeleton_skull 1"
+            chance: 0.1
+            message: "&6Rare drop: Wither Skeleton Skull!"
+        vip:
+          guaranteed-rewards: 1
+          reward1:
+            command: "give %player% coal 32"
+            chance: 1.0
+            message: "&b[VIP] You received 32 Coal!"
+          reward2:
+            command: "give %player% bone 16"
+            chance: 0.75
+            message: "&b[VIP] Bonus: 16 Bones!"
+          reward3:
+            command: "give %player% wither_skeleton_skull 1"
+            chance: 0.25
+            message: "&b[VIP] Rare drop: Wither Skeleton Skull!"
+
+  kill_giant:
+    mob-name: "GIANT"
+    message: "&aQuest complete! You have slain the Giant!"
+    quest-item:
+      material: IRON_SWORD
+      ModelData: 0
+      displayname: "&cGiant Slayer"
+      lore:
+        - "&7Only the bravest dare face"
+        - "&7the colossal Giant."
+        - "&7Required kills: &f3"
+    conditions:
+      kill: 3
+      slot: 13
+    reward:
+      drops:
+        default:
+          guaranteed-rewards: 2
+          reward1:
+            command: "give %player% emerald 5"
+            chance: 1.0
+            message: "&aYou received 5 Emeralds!"
+          reward2:
+            command: "money give %player% 500"
+            chance: 1.0
+            message: "&aYou received $500!"
+          reward3:
+            command: "give %player% diamond 2"
+            chance: 0.4
+            message: "&bBonus: 2 Diamonds!"
+        vip:
+          guaranteed-rewards: 2
+          reward1:
+            command: "give %player% emerald 10"
+            chance: 1.0
+            message: "&b[VIP] You received 10 Emeralds!"
+          reward2:
+            command: "money give %player% 1000"
+            chance: 1.0
+            message: "&b[VIP] You received $1000!"
+          reward3:
+            command: "give %player% diamond 5"
+            chance: 0.6
+            message: "&b[VIP] Bonus: 5 Diamonds!"

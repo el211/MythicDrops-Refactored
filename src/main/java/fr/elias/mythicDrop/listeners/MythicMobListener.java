@@ -4,6 +4,7 @@ import fr.elias.mythicDrop.MythicDrop;
 import fr.elias.mythicDrop.announcers.AnnounceDamageRanking;
 import fr.elias.mythicDrop.effects.EffectListener;
 import fr.elias.mythicDrop.handlers.RewardProcessingHandler;
+import fr.elias.mythicDrop.utils.ArenaManager;
 import fr.elias.mythicDrop.utils.DamageTracker;
 import io.lumine.mythic.bukkit.MythicBukkit;
 import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
@@ -77,6 +78,7 @@ public class MythicMobListener implements Listener {
         } finally {
             plugin.getProcessedMobEvents().remove(mobId);
             DamageTracker.clearMob(mobId);
+            ArenaManager.getInstance().handleMobRemoved(mobId);
             logDebug("Finished processing MythicMobDeathEvent for mob: " + mobName);
         }
     }
@@ -87,7 +89,9 @@ public class MythicMobListener implements Listener {
         if (activeMob == null) {
             return;
         }
-        DamageTracker.clearMob(activeMob.getUniqueId());
+        UUID mobId = activeMob.getUniqueId();
+        DamageTracker.clearMob(mobId);
+        ArenaManager.getInstance().handleMobRemoved(mobId);
     }
 
     private void logDamageRanking(ActiveMob activeMob) {

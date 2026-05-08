@@ -13,9 +13,25 @@ commands:
     usage: "/mythicdrop reload"
     permission: mythicdrop.reload
     permission-message: "You do not have permission to execute this command."
+  marena:
+    description: "Manage mob arenas"
+    usage: "/marena <setspawn|delete|list>"
+    permission: mythicdrop.arena
+    permission-message: "You do not have permission to manage arenas."
+  mquests:
+    description: "Open the quest menu"
+    usage: "/mquests"
+    permission: mythicdrop.quests
+    permission-message: "You do not have permission to view quests."
 
 # Permissions for the plugin
 permissions:
   mythicdrop.reload:
     description: "Allows reloading the MythicDrop configuration"
     default: op
+  mythicdrop.arena:
+    description: "Allows managing mob arenas via /marena"
+    default: op
+  mythicdrop.quests:
+    description: "Allows opening the quest menu via /mquests"
+    default: true

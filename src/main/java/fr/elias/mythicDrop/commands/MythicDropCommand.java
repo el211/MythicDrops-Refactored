@@ -27,7 +27,9 @@ public class MythicDropCommand implements CommandExecutor {
             debugConfig.reload();
             top3Config.reload();
             top5Config.reload();
-            effectsConfig.reload(); // <-- Add this
+            effectsConfig.reload();
+            questsConfig.reload();
+            plugin.getQuestManager().loadQuests(questsConfig);
 
             // Confirm to user
             sender.sendMessage(ChatColor.GREEN + "MythicDrop configuration reloaded successfully.");

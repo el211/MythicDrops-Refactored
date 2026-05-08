@@ -1,9 +1,19 @@
 package fr.elias.mythicDrop;
 
+import fr.elias.mythicDrop.commands.MArenaCommand;
+import fr.elias.mythicDrop.commands.MQuestsCommand;
 import fr.elias.mythicDrop.commands.MythicDropCommand;
+import fr.elias.mythicDrop.commands.tabCompleters.MArenaCompleter;
 import fr.elias.mythicDrop.commands.tabCompleters.MythicDropCompleter;
 import fr.elias.mythicDrop.effects.EffectInitializer;
 import fr.elias.mythicDrop.listeners.MythicMobListener;
+import fr.elias.mythicDrop.listeners.QuestCompletionListener;
+import fr.elias.mythicDrop.listeners.QuestGUIListener;
+import fr.elias.mythicDrop.listeners.QuestMobKillListener;
+import fr.elias.mythicDrop.quests.QuestDataPersistence;
+import fr.elias.mythicDrop.quests.QuestGUI;
+import fr.elias.mythicDrop.quests.QuestManager;
+import fr.elias.mythicDrop.utils.ArenaManager;
 import fr.elias.mythicDrop.utils.Config;
 import fr.elias.mythicDrop.utils.DamageTracker;
 import lombok.Getter;
@@ -37,6 +47,11 @@ public class MythicDrop extends JavaPlugin {
     public static Config top5Config;
     public static Config announcementConfig;
     public static Config effectsConfig;
+    public static Config questsConfig;
+
+    @Getter
+    private QuestManager questManager;
+    private QuestDataPersistence questDataPersistence;
 
     @Override
     public void onEnable() {
@@ -63,9 +78,19 @@ public class MythicDrop extends JavaPlugin {
             top5Config = new Config("top5damage.yml");
             announcementConfig = new Config("announcement.yml");
             effectsConfig = new Config("effects.yml");
+            questsConfig = new Config("quests.yml");
+
+            // Initialize quest system
+            questManager = new QuestManager(this);
+            questManager.loadQuests(questsConfig);
+            questDataPersistence = new QuestDataPersistence(this, questManager);
+            logDebug("Quest system initialized.");
 
             // Register listeners
             Bukkit.getPluginManager().registerEvents(new MythicMobListener(), this);
+            Bukkit.getPluginManager().registerEvents(new QuestMobKillListener(questManager), this);
+            Bukkit.getPluginManager().registerEvents(new QuestCompletionListener(), this);
+            Bukkit.getPluginManager().registerEvents(new QuestGUIListener(), this);
             logDebug("Event listeners registered.");
 
             // Register commands and tab completers
@@ -75,6 +100,22 @@ public class MythicDrop extends JavaPlugin {
                 logDebug("Commands and tab completers registered.");
             } else {
                 logDebug("Failed to register commands for 'mythicdrop'.");
+            }
+
+            if (this.getCommand("marena") != null) {
+                Objects.requireNonNull(this.getCommand("marena")).setExecutor(new MArenaCommand());
+                Objects.requireNonNull(this.getCommand("marena")).setTabCompleter(new MArenaCompleter());
+                logDebug("MArena commands registered.");
+            } else {
+                logDebug("Failed to register commands for 'marena'.");
+            }
+
+            if (this.getCommand("mquests") != null) {
+                QuestGUI questGUI = new QuestGUI(questManager);
+                Objects.requireNonNull(this.getCommand("mquests")).setExecutor(new MQuestsCommand(questGUI));
+                logDebug("MQuests command registered.");
+            } else {
+                logDebug("Failed to register commands for 'mquests'.");
             }
 
             // Validate MythicMobs dependency
@@ -87,6 +128,10 @@ public class MythicDrop extends JavaPlugin {
                 } catch (IllegalStateException e) {
                     logDebug("LuckPerms API could not be initialized: " + e.getMessage());
                 }
+
+                // Initialize arena manager and spawn all configured arenas
+                ArenaManager.getInstance().spawnAll();
+                logDebug("Arena manager initialized and arenas spawned.");
 
             } else {
                 logDebug("MythicMobs is not installed. Disabling MythicDrop...");
@@ -106,6 +151,8 @@ public class MythicDrop extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (questDataPersistence != null) questDataPersistence.save();
+        ArenaManager.getInstance().shutdown();
         processedMobEvents.clear();
         processedTop3Events.clear();
         processedTop5Events.clear();
