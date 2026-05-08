@@ -37,6 +37,14 @@
             <goals>
               <goal>shade</goal>
             </goals>
+            <configuration>
+              <relocations>
+                <relocation>
+                  <pattern>fr.minuskube.inv</pattern>
+                  <shadedPattern>fr.elias.mythicDrop.libs.smartinvs</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
           </execution>
         </executions>
       </plugin>
@@ -62,6 +70,10 @@
       <repository>
           <id>sonatype</id>
           <url>https://oss.sonatype.org/content/groups/public/</url>
+      </repository>
+      <repository>
+          <id>codemc-repo</id>
+          <url>https://repo.codemc.io/repository/maven-public/</url>
       </repository>
   </repositories>
 
@@ -89,6 +101,12 @@
           <artifactId>lombok</artifactId>
           <version>1.18.46</version>
           <scope>provided</scope>
+      </dependency>
+      <dependency>
+          <groupId>fr.minuskube.inv</groupId>
+          <artifactId>smart-invs</artifactId>
+          <version>1.2.7</version>
+          <scope>compile</scope>
       </dependency>
   </dependencies>
 </project>

@@ -1,21 +1,25 @@
 package fr.elias.mythicDrop;
 
 import fr.elias.mythicDrop.commands.MArenaCommand;
+import fr.elias.mythicDrop.commands.MMobsCommand;
 import fr.elias.mythicDrop.commands.MQuestsCommand;
 import fr.elias.mythicDrop.commands.MythicDropCommand;
 import fr.elias.mythicDrop.commands.tabCompleters.MArenaCompleter;
 import fr.elias.mythicDrop.commands.tabCompleters.MythicDropCompleter;
 import fr.elias.mythicDrop.effects.EffectInitializer;
+import fr.elias.mythicDrop.gui.MobsGUI;
+import fr.elias.mythicDrop.gui.QuestsSmartGUI;
 import fr.elias.mythicDrop.listeners.MythicMobListener;
 import fr.elias.mythicDrop.listeners.QuestCompletionListener;
 import fr.elias.mythicDrop.listeners.QuestGUIListener;
 import fr.elias.mythicDrop.listeners.QuestMobKillListener;
 import fr.elias.mythicDrop.quests.QuestDataPersistence;
-import fr.elias.mythicDrop.quests.QuestGUI;
 import fr.elias.mythicDrop.quests.QuestManager;
 import fr.elias.mythicDrop.utils.ArenaManager;
 import fr.elias.mythicDrop.utils.Config;
 import fr.elias.mythicDrop.utils.DamageTracker;
+import fr.elias.mythicDrop.utils.TopXManager;
+import fr.minuskube.inv.InventoryManager;
 import lombok.Getter;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
@@ -52,6 +56,11 @@ public class MythicDrop extends JavaPlugin {
     @Getter
     private QuestManager questManager;
     private QuestDataPersistence questDataPersistence;
+    @Getter
+    private InventoryManager inventoryManager;
+    @Getter
+    private TopXManager topXManager;
+    private QuestsSmartGUI questsSmartGUI;
 
     @Override
     public void onEnable() {
@@ -80,10 +89,20 @@ public class MythicDrop extends JavaPlugin {
             effectsConfig = new Config("effects.yml");
             questsConfig = new Config("quests.yml");
 
+            // Initialize SmartInvs
+            inventoryManager = new InventoryManager(this);
+            inventoryManager.init();
+            logDebug("SmartInvs initialized.");
+
+            // Initialize TopX manager (auto-discovers topNdamage.yml files)
+            topXManager = new TopXManager(getDataFolder());
+            logDebug("TopX manager loaded " + topXManager.getConfigs().size() + " custom topX config(s).");
+
             // Initialize quest system
             questManager = new QuestManager(this);
             questManager.loadQuests(questsConfig);
             questDataPersistence = new QuestDataPersistence(this, questManager);
+            questsSmartGUI = new QuestsSmartGUI(inventoryManager, questManager);
             logDebug("Quest system initialized.");
 
             // Register listeners
@@ -111,11 +130,18 @@ public class MythicDrop extends JavaPlugin {
             }
 
             if (this.getCommand("mquests") != null) {
-                QuestGUI questGUI = new QuestGUI(questManager);
-                Objects.requireNonNull(this.getCommand("mquests")).setExecutor(new MQuestsCommand(questGUI));
+                Objects.requireNonNull(this.getCommand("mquests")).setExecutor(new MQuestsCommand(questsSmartGUI));
                 logDebug("MQuests command registered.");
             } else {
                 logDebug("Failed to register commands for 'mquests'.");
+            }
+
+            if (this.getCommand("mmobs") != null) {
+                MobsGUI mobsGUI = new MobsGUI(inventoryManager);
+                Objects.requireNonNull(this.getCommand("mmobs")).setExecutor(new MMobsCommand(mobsGUI));
+                logDebug("MMobs command registered.");
+            } else {
+                logDebug("Failed to register commands for 'mmobs'.");
             }
 
             // Validate MythicMobs dependency
@@ -149,9 +175,14 @@ public class MythicDrop extends JavaPlugin {
 
 
 
+    public QuestsSmartGUI getQuestsSmartGUI() {
+        return questsSmartGUI;
+    }
+
     @Override
     public void onDisable() {
         if (questDataPersistence != null) questDataPersistence.save();
+        if (topXManager != null) topXManager.reload(); // clear caches
         ArenaManager.getInstance().shutdown();
         processedMobEvents.clear();
         processedTop3Events.clear();

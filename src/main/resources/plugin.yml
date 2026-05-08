@@ -23,6 +23,11 @@ commands:
     usage: "/mquests"
     permission: mythicdrop.quests
     permission-message: "You do not have permission to view quests."
+  mmobs:
+    description: "Browse configured MythicMobs"
+    usage: "/mmobs"
+    permission: mythicdrop.mmobs
+    permission-message: "You do not have permission to browse mobs."
 
 # Permissions for the plugin
 permissions:
@@ -35,3 +40,6 @@ permissions:
   mythicdrop.quests:
     description: "Allows opening the quest menu via /mquests"
     default: true
+  mythicdrop.mmobs:
+    description: "Allows browsing MythicMobs via /mmobs"
+    default: op

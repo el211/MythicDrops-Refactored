@@ -4,7 +4,11 @@ import fr.elias.mythicDrop.MythicDrop;
 import io.lumine.mythic.bukkit.events.MythicMobDeathEvent;
 import io.lumine.mythic.core.mobs.ActiveMob;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+
+import java.util.Map;
+import java.util.Optional;
 
 import static fr.elias.mythicDrop.MythicDrop.top3Config;
 import static fr.elias.mythicDrop.MythicDrop.top5Config;
@@ -29,6 +33,10 @@ public class RewardProcessingHandler {
         } else if (listContainsIgnoreCase(top5Config.getStringList("rewardtop5"), mobName)) {
             logDebug("Delegating to Top5RewardsHandler for mob: " + mobName);
             Top5RewardsHandler.handle(activeMob);
+        } else if (MythicDrop.getInstance().getTopXManager().getConfigForMob(mobName).isPresent()) {
+            Map.Entry<Integer, YamlConfiguration> topXEntry = MythicDrop.getInstance().getTopXManager().getConfigForMob(mobName).get();
+            logDebug("Delegating to TopXRewardsHandler for mob: " + mobName + " (topX=" + topXEntry.getKey() + ")");
+            TopXRewardsHandler.handle(activeMob, topXEntry.getKey(), topXEntry.getValue());
         } else if (hasConfigDrops && useMostDamage) {
             logDebug("Mob " + mobName + " has config.yml drops and most-damage mode enabled. Delegating to MostDamageRewardsHandler.");
             MostDamageRewardsHandler.handle(activeMob);
