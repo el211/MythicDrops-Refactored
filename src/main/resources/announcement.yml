@@ -13,3 +13,5 @@ announce-specific-mob: # In this section you can specify which exact MythicMobs 
   SkeletonLord: true
   SkeletonWarrior: false
   Giant: true
+  CAVE_SPIDER: false
+  WITHER_SKELETON: false
