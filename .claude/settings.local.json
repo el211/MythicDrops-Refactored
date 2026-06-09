@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/io/lumine/Mythic-Dist/5.11.2/Mythic-Dist-5.11.2.jar\" io.lumine.mythic.api.mobs.MobManager)",
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/io/lumine/Mythic-Dist/5.11.2/Mythic-Dist-5.11.2.jar\" io.lumine.mythic.api.mobs.MythicMob)",
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/fr/minuskube/inv/smart-invs/1.2.7/smart-invs-1.2.7.jar\" fr.minuskube.inv.InventoryManager)",
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/fr/minuskube/inv/smart-invs/1.2.7/smart-invs-1.2.7.jar\" fr.minuskube.inv.SmartInventory)",
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/fr/minuskube/inv/smart-invs/1.2.7/smart-invs-1.2.7.jar\" fr.minuskube.inv.content.InventoryContents)",
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/fr/minuskube/inv/smart-invs/1.2.7/smart-invs-1.2.7.jar\" fr.minuskube.inv.content.Pagination)",
+      "Bash(javap -classpath C:/Users/PC/.m2/repository/fr/minuskube/inv/smart-invs/1.2.7/smart-invs-1.2.7.jar 'fr.minuskube.inv.SmartInventory$Builder')",
+      "Bash(javap -classpath \"C:/Users/PC/.m2/repository/fr/minuskube/inv/smart-invs/1.2.7/smart-invs-1.2.7.jar\" fr.minuskube.inv.ClickableItem)",
+      "Bash(mvn compile:*)",
+      "Bash(find .:*)",
+      "Bash(grep -n \"replace\\\\|Bukkit.dispatchCommand\" ./src/main/java/fr/elias/mythicDrop/quests/*.java)",
+      "Bash(xargs grep:*)",
+      "Bash(npx create-next-app@latest docs-site --js --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --yes)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\({next: p.dependencies.next, tailwindcss: p.devDependencies.tailwindcss}, null, 2\\)\\)\")",
+      "Bash(npm run:*)"
+    ]
+  }
+}

@@ -1,0 +1,92 @@
+# Example TopX config — this file is auto-discovered by the plugin.
+# You can create top7damage.yml, top10damage.yml, top15damage.yml etc.
+# Use "position-1", "position-2", ... "position-N" for rank sections.
+
+topX: 7
+rewardtopX:
+  - DragonBoss
+
+rewardtopX-settings:
+  use-flexible-rewards: true
+
+DragonBoss:
+  use-standard-rewards: false
+  guaranteedperrank: true
+  per-rank-group: true
+  guaranteed-rewards:
+    default: 1
+    vip: 2
+
+  position-1:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% netherite_ingot 1"
+        chance: 1.0
+        message: "&6#1 Damage Dealer! You got a Netherite Ingot!"
+    vip:
+      drop1:
+        command: "give %player% netherite_ingot 3"
+        chance: 1.0
+        message: "&b[VIP] #1 Damage Dealer! You got 3 Netherite Ingots!"
+
+  position-2:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% diamond 5"
+        chance: 1.0
+        message: "&e#2! You got 5 Diamonds!"
+    vip:
+      drop1:
+        command: "give %player% diamond 10"
+        chance: 1.0
+        message: "&b[VIP] #2! You got 10 Diamonds!"
+
+  position-3:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% diamond 3"
+        chance: 0.9
+        message: "&a#3! You got 3 Diamonds!"
+
+  position-4:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% emerald 5"
+        chance: 0.8
+        message: "&a#4! You got 5 Emeralds!"
+
+  position-5:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% emerald 3"
+        chance: 0.7
+        message: "&a#5! You got 3 Emeralds!"
+
+  position-6:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% gold_ingot 16"
+        chance: 0.6
+        message: "&a#6! You got 16 Gold Ingots!"
+
+  position-7:
+    guaranteed-rewards: 1
+    default:
+      drop1:
+        command: "give %player% iron_ingot 32"
+        chance: 0.5
+        message: "&a#7! You got 32 Iron Ingots!"
+
+  everyone-else-who-contributed:
+    min-damage: 100.0
+    default:
+      drop1:
+        command: "give %player% coal 16"
+        chance: 0.4
+        message: "&7Thanks for contributing! Here's some coal."

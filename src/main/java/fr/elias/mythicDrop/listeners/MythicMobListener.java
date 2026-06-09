@@ -78,7 +78,7 @@ public class MythicMobListener implements Listener {
         } finally {
             plugin.getProcessedMobEvents().remove(mobId);
             DamageTracker.clearMob(mobId);
-            ArenaManager.getInstance().handleMobRemoved(mobId);
+            ArenaManager.getInstance().handleMobDeath(mobId);
             logDebug("Finished processing MythicMobDeathEvent for mob: " + mobName);
         }
     }
@@ -91,7 +91,7 @@ public class MythicMobListener implements Listener {
         }
         UUID mobId = activeMob.getUniqueId();
         DamageTracker.clearMob(mobId);
-        ArenaManager.getInstance().handleMobRemoved(mobId);
+        ArenaManager.getInstance().handleMobDespawn(mobId);
     }
 
     private void logDamageRanking(ActiveMob activeMob) {

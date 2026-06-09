@@ -5,6 +5,7 @@ import io.lumine.mythic.api.mobs.MythicMob;
 import io.lumine.mythic.bukkit.BukkitAdapter;
 import io.lumine.mythic.bukkit.MythicBukkit;
 import io.lumine.mythic.core.mobs.ActiveMob;
+import io.lumine.mythic.core.mobs.DespawnMode;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -13,6 +14,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+
+import static fr.elias.mythicDrop.utils.DebugLogger.logDebug;
 
 public class ArenaManager {
 
@@ -28,6 +31,10 @@ public class ArenaManager {
     private final Map<String, Integer> respawnTasks = new HashMap<>();
     // mob UUID -> pending despawn task ID
     private final Map<UUID, Integer> despawnTasks = new HashMap<>();
+    // mob UUID -> spawn timestamp for arena lifecycle diagnostics
+    private final Map<UUID, Long> spawnTimes = new HashMap<>();
+    // mob UUIDs currently being despawned by MythicDrop's own timer
+    private final Set<UUID> scheduledDespawns = new HashSet<>();
 
     private ArenaManager(MythicDrop plugin) {
         this.plugin = plugin;
@@ -114,6 +121,26 @@ public class ArenaManager {
         return arenaConfig.contains("arenas." + name);
     }
 
+    /** Returns true if the arena currently has a live mob spawned. */
+    public boolean isMobAlive(String arenaName) {
+        return liveMobs.containsValue(arenaName);
+    }
+
+    /** Returns the number of arena mobs currently alive across all arenas. */
+    public int getLiveMobCount() {
+        return liveMobs.size();
+    }
+
+    /** Returns the configured MythicMob type for the given arena, or "unknown". */
+    public String getArenaMob(String arenaName) {
+        return arenaConfig.getString("arenas." + arenaName + ".mob", "unknown");
+    }
+
+    /** Returns the configured world name for the given arena, or "unknown". */
+    public String getArenaWorld(String arenaName) {
+        return arenaConfig.getString("arenas." + arenaName + ".world", "unknown");
+    }
+
     /**
      * Returns a formatted summary line for the given arena.
      */
@@ -185,20 +212,30 @@ public class ArenaManager {
         }
 
         UUID mobUUID = activeMob.getUniqueId();
+        forceArenaDespawnMode(activeMob, name, mobType);
         liveMobs.put(mobUUID, name);
+        spawnTimes.put(mobUUID, System.currentTimeMillis());
 
         // Schedule despawn if configured
         int despawnDelay = arenaConfig.getInt(p + "despawn");
         if (despawnDelay > 0) {
             int taskId = Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 despawnTasks.remove(mobUUID);
-                if (liveMobs.remove(mobUUID) != null) {
+                if (liveMobs.containsKey(mobUUID)) {
+                    scheduledDespawns.add(mobUUID);
                     activeMob.despawn();
-                    scheduleRespawn(name);
+                    if (liveMobs.remove(mobUUID) != null) {
+                        spawnTimes.remove(mobUUID);
+                        scheduledDespawns.remove(mobUUID);
+                        scheduleRespawn(name);
+                    }
                 }
             }, (long) despawnDelay * 20L).getTaskId();
             despawnTasks.put(mobUUID, taskId);
         }
+
+        logDebug("Arena '" + name + "' spawned mob '" + mobType + "' with respawn="
+                + arenaConfig.getInt(p + "respawn") + "s, despawn=" + despawnDelay + "s.");
     }
 
     // -------------------------------------------------------------------------
@@ -209,13 +246,37 @@ public class ArenaManager {
      * Called when any MythicMob dies or despawns.
      * If it belonged to an arena, a respawn is scheduled.
      */
-    public void handleMobRemoved(UUID mobUUID) {
+    public void handleMobDeath(UUID mobUUID) {
+        handleMobRemoved(mobUUID, RemovalCause.DEATH);
+    }
+
+    public void handleMobDespawn(UUID mobUUID) {
+        handleMobRemoved(mobUUID, RemovalCause.DESPAWN);
+    }
+
+    private void handleMobRemoved(UUID mobUUID, RemovalCause cause) {
         String arenaName = liveMobs.remove(mobUUID);
+        Long spawnTime = spawnTimes.remove(mobUUID);
+        boolean scheduledByPlugin = scheduledDespawns.remove(mobUUID);
         if (arenaName == null) return;
 
         // Cancel pending despawn task for this mob
         Integer despawnTask = despawnTasks.remove(mobUUID);
         if (despawnTask != null) Bukkit.getScheduler().cancelTask(despawnTask);
+
+        if (cause == RemovalCause.DESPAWN) {
+            long lifetimeMillis = spawnTime == null ? -1L : System.currentTimeMillis() - spawnTime;
+            int configuredDespawn = arenaConfig.getInt("arenas." + arenaName + ".despawn");
+            if (scheduledByPlugin) {
+                logDebug("Arena '" + arenaName + "' despawned by MythicDrop after "
+                        + formatLifetimeSeconds(lifetimeMillis) + "s.");
+            } else if (configuredDespawn > 0 && lifetimeMillis >= 0L
+                    && lifetimeMillis + 1000L < configuredDespawn * 1000L) {
+                MythicLogger.warn("Arena '" + arenaName + "' mob despawned after "
+                        + formatLifetimeSeconds(lifetimeMillis) + "s, before the configured "
+                        + configuredDespawn + "s timer. This despawn did not come from MythicDrop.");
+            }
+        }
 
         scheduleRespawn(arenaName);
     }
@@ -247,6 +308,8 @@ public class ArenaManager {
             if (name.equals(entry.getValue())) {
                 Integer dt = despawnTasks.remove(entry.getKey());
                 if (dt != null) Bukkit.getScheduler().cancelTask(dt);
+                spawnTimes.remove(entry.getKey());
+                scheduledDespawns.remove(entry.getKey());
                 return true;
             }
             return false;
@@ -261,6 +324,29 @@ public class ArenaManager {
         despawnTasks.values().forEach(Bukkit.getScheduler()::cancelTask);
         respawnTasks.clear();
         despawnTasks.clear();
+        spawnTimes.clear();
+        scheduledDespawns.clear();
         liveMobs.clear();
+    }
+
+    private void forceArenaDespawnMode(ActiveMob activeMob, String arenaName, String mobType) {
+        try {
+            activeMob.setDespawnMode(DespawnMode.NEVER);
+            if (activeMob.getEntity() != null) {
+                activeMob.getEntity().setRemoveWhenFarAway(false);
+            }
+        } catch (Exception e) {
+            MythicLogger.warn("Arena '" + arenaName + "': failed to force despawn mode for mob '"
+                    + mobType + "': " + e.getMessage());
+        }
+    }
+
+    private long formatLifetimeSeconds(long lifetimeMillis) {
+        return Math.max(0L, lifetimeMillis / 1000L);
+    }
+
+    private enum RemovalCause {
+        DEATH,
+        DESPAWN
     }
 }

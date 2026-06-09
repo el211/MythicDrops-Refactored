@@ -4,7 +4,7 @@ main: fr.elias.mythicDrop.MythicDrop
 api-version: '1.21'
 author: Elias
 depend: [MythicMobs]
-softdepend: [LuckPerms]
+softdepend: [LuckPerms, PlaceholderAPI]
 load: STARTUP
 # Commands for the plugin
 commands:

@@ -1,6 +1,7 @@
 package fr.elias.mythicDrop;
 
 import fr.elias.mythicDrop.commands.MArenaCommand;
+import fr.elias.mythicDrop.placeholders.MythicDropExpansion;
 import fr.elias.mythicDrop.commands.MMobsCommand;
 import fr.elias.mythicDrop.commands.MQuestsCommand;
 import fr.elias.mythicDrop.commands.MythicDropCommand;
@@ -158,6 +159,14 @@ public class MythicDrop extends JavaPlugin {
                 // Initialize arena manager and spawn all configured arenas
                 ArenaManager.getInstance().spawnAll();
                 logDebug("Arena manager initialized and arenas spawned.");
+
+                // Register PlaceholderAPI expansion if present
+                if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+                    new MythicDropExpansion(this).register();
+                    logDebug("PlaceholderAPI expansion registered.");
+                } else {
+                    logDebug("PlaceholderAPI not found — PAPI placeholders unavailable.");
+                }
 
             } else {
                 logDebug("MythicMobs is not installed. Disabling MythicDrop...");

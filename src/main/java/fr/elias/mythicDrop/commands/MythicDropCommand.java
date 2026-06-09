@@ -1,6 +1,7 @@
 package fr.elias.mythicDrop.commands;
 
 import fr.elias.mythicDrop.MythicDrop;
+import fr.elias.mythicDrop.utils.MythicMobConfigReader;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -31,6 +32,7 @@ public class MythicDropCommand implements CommandExecutor {
             questsConfig.reload();
             plugin.getQuestManager().loadQuests(questsConfig);
             plugin.getTopXManager().reload();
+            MythicMobConfigReader.clearCache();
 
             // Confirm to user
             sender.sendMessage(ChatColor.GREEN + "MythicDrop configuration reloaded successfully.");
