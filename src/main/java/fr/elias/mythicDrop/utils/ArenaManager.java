@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,12 +30,16 @@ public class ArenaManager {
     private final Map<UUID, String> liveMobs = new HashMap<>();
     // arena name -> pending respawn task ID
     private final Map<String, Integer> respawnTasks = new HashMap<>();
+    // arena name -> pending retry-spawn task ID (used when spawn failed or no player nearby)
+    private final Map<String, Integer> retryTasks = new HashMap<>();
     // mob UUID -> pending despawn task ID
     private final Map<UUID, Integer> despawnTasks = new HashMap<>();
     // mob UUID -> spawn timestamp for arena lifecycle diagnostics
     private final Map<UUID, Long> spawnTimes = new HashMap<>();
     // mob UUIDs currently being despawned by MythicDrop's own timer
     private final Set<UUID> scheduledDespawns = new HashSet<>();
+
+    private static final int RETRY_DELAY_SECONDS = 60;
 
     private ArenaManager(MythicDrop plugin) {
         this.plugin = plugin;
@@ -202,12 +207,22 @@ public class ArenaManager {
         double z = arenaConfig.getDouble(p + "z");
         float yaw = (float) arenaConfig.getDouble(p + "yaw");
         float pitch = (float) arenaConfig.getDouble(p + "pitch");
+        int radius = arenaConfig.getInt(p + "radius");
 
         Location loc = new Location(world, x, y, z, yaw, pitch);
+
+        // If a radius is configured, require at least one player to be within it before spawning
+        if (radius > 0 && !isPlayerWithinRadius(loc, radius)) {
+            logDebug("Arena '" + name + "': no player within radius " + radius + " — scheduling retry in " + RETRY_DELAY_SECONDS + "s.");
+            scheduleRetry(name);
+            return;
+        }
+
         ActiveMob activeMob = mythicMob.get().spawn(BukkitAdapter.adapt(loc), 1);
 
         if (activeMob == null) {
-            MythicLogger.warn("Arena '" + name + "': spawn call returned null for mob '" + mobType + "'.");
+            MythicLogger.warn("Arena '" + name + "': spawn call returned null for mob '" + mobType + "' — scheduling retry in " + RETRY_DELAY_SECONDS + "s.");
+            scheduleRetry(name);
             return;
         }
 
@@ -285,6 +300,9 @@ public class ArenaManager {
         if (!arenaConfig.contains("arenas." + name)) return;
         // Don't schedule a second respawn if one is already queued
         if (respawnTasks.containsKey(name)) return;
+        // Cancel any pending retry — respawn takes priority
+        Integer rt = retryTasks.remove(name);
+        if (rt != null) Bukkit.getScheduler().cancelTask(rt);
 
         int delay = arenaConfig.getInt("arenas." + name + ".respawn");
         int taskId = Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -296,6 +314,37 @@ public class ArenaManager {
         respawnTasks.put(name, taskId);
     }
 
+    /**
+     * Schedules a short retry to spawn the arena mob when the initial spawn failed
+     * (e.g. no players within radius, or MythicMobs returned null).
+     */
+    private void scheduleRetry(String name) {
+        if (!arenaConfig.contains("arenas." + name)) return;
+        // Skip if a respawn or another retry is already pending
+        if (respawnTasks.containsKey(name)) return;
+        if (retryTasks.containsKey(name)) return;
+
+        int taskId = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            retryTasks.remove(name);
+            if (arenaConfig.contains("arenas." + name) && !liveMobs.containsValue(name)) {
+                spawnArena(name);
+            }
+        }, (long) RETRY_DELAY_SECONDS * 20L).getTaskId();
+        retryTasks.put(name, taskId);
+        logDebug("Arena '" + name + "': retry spawn scheduled in " + RETRY_DELAY_SECONDS + "s.");
+    }
+
+    private boolean isPlayerWithinRadius(Location loc, int radius) {
+        double radiusSq = (double) radius * radius;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getWorld().equals(loc.getWorld())
+                    && player.getLocation().distanceSquared(loc) <= radiusSq) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // -------------------------------------------------------------------------
     // Cleanup
     // -------------------------------------------------------------------------
@@ -303,6 +352,9 @@ public class ArenaManager {
     private void cancelArenaTasks(String name) {
         Integer rt = respawnTasks.remove(name);
         if (rt != null) Bukkit.getScheduler().cancelTask(rt);
+
+        Integer rtt = retryTasks.remove(name);
+        if (rtt != null) Bukkit.getScheduler().cancelTask(rtt);
 
         liveMobs.entrySet().removeIf(entry -> {
             if (name.equals(entry.getValue())) {
@@ -321,8 +373,10 @@ public class ArenaManager {
      */
     public void shutdown() {
         respawnTasks.values().forEach(Bukkit.getScheduler()::cancelTask);
+        retryTasks.values().forEach(Bukkit.getScheduler()::cancelTask);
         despawnTasks.values().forEach(Bukkit.getScheduler()::cancelTask);
         respawnTasks.clear();
+        retryTasks.clear();
         despawnTasks.clear();
         spawnTimes.clear();
         scheduledDespawns.clear();
